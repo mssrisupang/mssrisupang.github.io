@@ -39,6 +39,8 @@ To foster a collaborative and innovative research environment where we work on r
 | Kotchakorn Mingma    | #8    |  2021              | Software Engineer at Siam Commercial Bank HQ.  |
 | Nattanon Suwansaeng   | #8    |  2021             | Software Engineer at Siam Commercial Bank HQ. |
 | Nuttakorn Kananusorn  | #8    |  2021             | Software Engineer at Siam Commercial Bank HQ.  |
+| Kraiwit Roopchom      | #7    |  2020             | Front end developer at Conicle Co., Ltd. |
+| Chadaporn Kuakul      | #7    |  2020             | Business Owner  |
 
 
 ---
