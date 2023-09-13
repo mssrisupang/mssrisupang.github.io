@@ -141,6 +141,14 @@ a.sidebar-nav-item:focus {
   }
 }
 
+@media (max-width: 30em) {
+  .sidebar-about img {
+    display: block;
+    margin: 0 auto;
+  }
+}
+
+
 
 /*
  * Reverse layout
