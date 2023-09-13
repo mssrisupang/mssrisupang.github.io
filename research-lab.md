@@ -37,7 +37,9 @@ To foster a collaborative and innovative research environment where we work on r
 | Suttawas Piromsook   | #8    |  2021              | Junior Automation Tester at EAware Outsourcing Services Corporation (Thailand) Ltd.  |
 | Siwatch Sritrakul    | #8    |  2021              | Software Developer (Backend Dev) at Sirisoft Public Company Limited    |
 | Kotchakorn Mingma    | #8    |  2021              | Software Engineer at Siam Commercial Bank HQ.  |
-| Nattanon Suwansaeng   | #8    |  2021              | Software Engineer at Siam Commercial Bank HQ. |
+| Nattanon Suwansaeng   | #8    |  2021             | Software Engineer at Siam Commercial Bank HQ. |
+| Nuttakorn Kananusorn  | #8    |  2021             | Software Engineer at Siam Commercial Bank HQ.  |
+
 
 ---
 ## Join the AMLR Lab Team
