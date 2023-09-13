@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Welcome AMLR Lab
+title: Welcome to AMLR Lab
 ---
 
 <p>Welcome to my personal space. I am excited to introduce you to the <a href="/research-lab/">Applied Machine Learning Research Lab.</a> It is a place where we work on AI, ML, and computer vision projects. You can find out about the work we do on our lab page.</p>

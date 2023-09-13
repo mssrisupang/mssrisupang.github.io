@@ -7,7 +7,9 @@ permalink: /research-lab/
 ## Applied Machine Learning Research Lab
 
 <p class="message">
-Welcome to the AMLR Lab! Here we focus on cutting-edge research in the fields of AI, ML, and computer vision.</p>
+"Machine Learning models do not predict the future.
+They just find patterns in the past."
+(Pau Labarta Bajo, 2023) </p>
 
 ## Our Mission
 
