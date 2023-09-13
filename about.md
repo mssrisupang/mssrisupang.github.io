@@ -49,11 +49,11 @@ title: About Me
 #### Publications
 
 1. **Srisupang T.**, and Pattakorn B., “Machine Learning-based System for Automatic Morphological Identification of Acanthamoeba spp. in Microscopic Images”, The Journal of King Mongkut's University of Technology North Bangkok, Vol.22, No. 4, 2023. (in Thai) ([DOI](http://dx.doi.org/10.14416/j.kmutnb.2022.09.014)) (TCI-1)
-2. **Srisupang T.**, and Keiichi H., “Local Spatial Information with Bag-of-Visual-Words Model via Graph-based Representation for Texture Classification,” International Journal of Innovative Computing, Information and Control, Vol.16, No.5, pp. 1611-1621, Oct 2020. (Scopus indexed) ([DOI](10.24507/ijicic.16.05.1611))
-3. **Srisupang T.**, and Keiichi H., “Texture Classification by Local Spatial Pattern Mapping based on Complex Network Model,” International Journal of Innovative Computing, Information and Control, Vol.14, No.3, pp.1113-1121, June 2018. (Scopus indexed) ([DOI](10.24507/ijicic.14.03.1113))
+2. **Srisupang T.**, and Keiichi H., “Local Spatial Information with Bag-of-Visual-Words Model via Graph-based Representation for Texture Classification,” International Journal of Innovative Computing, Information and Control, Vol.16, No.5, pp. 1611-1621, Oct 2020. (Scopus indexed) ([DOI](https://doi.org/10.24507/ijicic.16.05.1611))
+3. **Srisupang T.**, and Keiichi H., “Texture Classification by Local Spatial Pattern Mapping based on Complex Network Model,” International Journal of Innovative Computing, Information and Control, Vol.14, No.3, pp.1113-1121, June 2018. (Scopus indexed) ([DOI](https://doi.org/10.24507/ijicic.14.03.1113))
 4. **Srisupang T.**, and Keiichi H., “Texture-based Features for Clothing classification via Graph-based Representation,” Journal of Signal Processing, Vol. 22, No.6, pp.299-305, November 2018. ([DOI](10.2299/jsp.22.299))
-5. Krisda L., Theerapat M., Itthi S., Patipan L., and **Srisupang T.**, “Web-based System for Post COVID-19 Telerehabilitation Research”, 2022 6th International Conference on Information Technology (InCIT2022), pp.19-22, November, 10-11, Nonthaburi, Thailand, 2022. ([DOI](10.1109/InCIT56086.2022.10067777))
-6. Thanaphon R., **Srisupang T.**, Theekapun C., and Kanjana P., "A Method for Detecting Lines on Soccer Field by Color of Grass Variation," 2020 12th International Conference on Knowledge and Smart Technology (KST), pp. 131-134, Pattaya, Chonburi, Thailand, 2020. ([DOI](10.1109/KST48564.2020.9059550))
+5. Krisda L., Theerapat M., Itthi S., Patipan L., and **Srisupang T.**, “Web-based System for Post COVID-19 Telerehabilitation Research”, 2022 6th International Conference on Information Technology (InCIT2022), pp.19-22, November, 10-11, Nonthaburi, Thailand, 2022. ([DOI](https://doi.org/10.1109/InCIT56086.2022.10067777))
+6. Thanaphon R., **Srisupang T.**, Theekapun C., and Kanjana P., "A Method for Detecting Lines on Soccer Field by Color of Grass Variation," 2020 12th International Conference on Knowledge and Smart Technology (KST), pp. 131-134, Pattaya, Chonburi, Thailand, 2020. ([DOI](https://doi.org/10.1109/KST48564.2020.9059550))
 
 ---
 
