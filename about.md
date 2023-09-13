@@ -2,7 +2,7 @@
 layout: page
 title: About Me
 ---
-
+## Srisupang Thewsuwan
 <p class="message">
   Currently working as an Assistant Professor at Srinakharinwirot University, Thailand, with a demonstrated history of working in the higher education industry. Skilled in MATLAB, Python/R programming, especially in the Digital Image processing and Computer Vision research fields. Strong education professional with a Doctor of Philosophy - Ph.D. focused on Life Science and Systems Engineering from Kyushu Institute of Technology, Japan.
 </p>
@@ -11,18 +11,21 @@ title: About Me
 
 ### Academic Background
 
-- **Ph.D.**, Image Processing, Human Intelligence Systems, Kyushu Institute of Technology, Japan, 2015-2018
-- **M.Eng.**, Electrical and Information Engineering, King Mongkut’s University of Technology Thonburi, Thailand, 2013-2015
-- **B.Eng.**, Biomedical Engineering, Srinakharinwirot University, Thailand, 2008-2012
+| Degree   | Major/Specialization                         | Institution                                           | Year       |
+|----------|----------------------------------------------|--------------------------------------------------------|------------|
+| Ph.D.    | Image Processing, Human Intelligence Systems | Kyushu Institute of Technology, Japan                 | 2015-2018  |
+| M.Eng.   | Electrical and Information Engineering       | King Mongkut’s University of Technology Thonburi, Thailand | 2013-2015  |
+| B.Eng.   | Biomedical Engineering                       | Srinakharinwirot University, Thailand                 | 2008-2012  |
 
 ---
 
-### Work Experience
+### Career Timeline
 
-- **Assistant Professor**, Department of Computer Engineering, Srinakharinwirot University, Nov 2021-Present
-- **Lecturer**, Department of Computer Engineering, Srinakharinwirot University, Feb 2019-Nov 2021
-- **Product Specialist Supervisor**, Filtech Enterprise 1994 PCL, 2012-2015
-
+| Position                     | Organization                              | Duration        |
+|------------------------------|-------------------------------------------|-----------------|
+| Assistant Professor          | Department of Computer Engineering, Srinakharinwirot University | Nov 2021-Present |
+| Lecturer                     | Department of Computer Engineering, Srinakharinwirot University | Feb 2019-Nov 2021 |
+| Product Specialist Supervisor| Filtech Enterprise 1994 PCL               | 2012-2015       |
 ---
 
 ### Research Focus
@@ -35,9 +38,11 @@ title: About Me
 
 ### Key Projects
 
-- **Development of iris liveness detection for contact-lens attacks using spatial texture analysis**, Project Leader, Completed, 2019
-- **Impact of illumination directions on face identification by spatial texture analysis**, Project Leader, Completed, 2019
-- **Automated Morphological Identification of Acanthameoba spp. System Using Machine Learning technique**, Project Leader, On Process, 2022
+| Year  | Title                                                                 | Role          | Status    |
+|-------|-----------------------------------------------------------------------|---------------|-----------|
+| 2019  | Development of iris liveness detection for contact-lens attacks using spatial texture analysis | Project Leader | Completed |
+| 2019  | Impact of illumination directions on face identification by spatial texture analysis | Project Leader | Completed |
+| 2022  | Automated Morphological Identification of Acanthameoba spp. System Using Machine Learning technique | Project Leader | On Process |
 
 ---
 
@@ -54,11 +59,13 @@ title: About Me
 
 ### Awards
 
-- **Outstanding Award for Implementing Active Learning Technique in the Classroom**, 2022
-- **New Researcher Award (Gold Medal)**, 2021
-- **Fellow of the Higher Education Academy (FHEA)**, 2021
-- **Japanese Government (MEXT) Scholarship**, 2015-2018
-- **Bronze Medal for Nystagmus Detection System for Vertigo Diagnosis System**, 2015
+| Year  | Award                                                                 |
+|-------|-----------------------------------------------------------------------|
+| 2022  | Outstanding Award for Implementing Active Learning Technique in the Classroom |
+| 2021  | New Researcher Award (Gold Medal)                                     |
+| 2021  | Fellow of the Higher Education Academy (FHEA)                         |
+| 2015-2018 | Japanese Government (MEXT) Scholarship                             |
+| 2015  | Bronze Medal for Nystagmus Detection System for Vertigo Diagnosis System |
 
 ---
 
