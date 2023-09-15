@@ -1,10 +1,8 @@
 ---
 layout: page
-title: Research Lab
+title: Applied Machine Learning Research Lab
 permalink: /research-lab/
 ---
-
-## Applied Machine Learning Research Lab
 
 <p class="message">
 "Machine Learning models do not predict the future.
