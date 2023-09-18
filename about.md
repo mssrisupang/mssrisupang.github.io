@@ -26,6 +26,7 @@ title: About Me
 | Assistant Professor          | Department of Computer Engineering, Srinakharinwirot University | Nov 2021-Present |
 | Lecturer                     | Department of Computer Engineering, Srinakharinwirot University | Feb 2019-Nov 2021 |
 | Product Specialist Supervisor| Filtech Enterprise 1994 PCL               | 2012-2015       |
+
 ---
 
 ### Research Focus
