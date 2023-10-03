@@ -62,7 +62,8 @@ title: About Me
 
 | Year  | Award                                                                 |
 |-------|-----------------------------------------------------------------------|
-| 2022  | Outstanding Active Learning Practice Award                          |
+| 2023  | Outstanding Active Learning Practice Award (University Level)           |
+| 2022  | Outstanding Active Learning Practice Award (Faculty Level)              |
 | 2021  | New Researcher Award (Gold Medal)                                     |
 | 2021  | Fellow of the Higher Education Academy (FHEA)                         |
 | 2015-2018 | Japanese Government (MEXT) Scholarship                             |
