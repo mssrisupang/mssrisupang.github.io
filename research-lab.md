@@ -19,7 +19,7 @@ To foster a collaborative and innovative research environment where we work on r
 
 | Year  | Research Field/Topic           |        Project Title                                |    Paper Link                   | Notable Achievements      |
 |-------|--------------------------------|-----------------------------------------------------|---------------------------------|------------------------------
-| 2024  | LLMs   |  Retrieval Augmented Generation Based Thai Question-Answering System | [Download Paper]() | -  Published Paper in [ICBIR2024] (https://doi.org/10.1109/ICBIR61386.2024.10875697) |
+| 2024  | LLMs   |  Retrieval Augmented Generation Based Thai Question-Answering System | Download Paper | -  Published Paper in [ICBIR2024](https://doi.org/10.1109/ICBIR61386.2024.10875697) |
 | 2022  | Image processing & Computer Vision   |  Bed exit monitoring system for alerting caregivers in Long-Term-Care | [Download Paper](https://drive.google.com/file/d/1GvOXlH--kjaelC7ZhBpP0NYKkyUQDA9h/view?usp=sharing) | - NSC Challenge Round 2 (2023) |
 | 2021  | Web Application Development          |  Telemedicine Platform for Post Treatment Tracking of COVID-19 Patient *(Co-Advisor)*| [Download Paper](https://drive.google.com/file/d/1gUF1FlNn7inMQ3b23Ob2pGQVz1pbdane/view?usp=sharing)| - Published Paper in [INCIT2022](https://doi.org/10.1109/InCIT56086.2022.10067777) |
 | 2021  | Mobile Application Development, Sensor   |  Development of a chest movement detection system with acceleration sensor for respiratory rate measurement *(Co-Advisor)* | [Download Paper](https://drive.google.com/file/d/1sOOmyccszOVrIweeKXoDheYeM4FKcoc1/view?usp=sharing) |
