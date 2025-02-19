@@ -32,7 +32,7 @@ To foster a collaborative and innovative research environment where we work on r
 
 | Name                 | CPE#   |  Graduation Year | Current Position/Institution                                         |
 |----------------------|-------|-------------------  |--------------------------------------------------------------------|
-| Pluempiti Yookasame  |  #10     2023              |  xxxxxxx                                               |
+| Pluempiti Yookasame  |  #10  |  2023              |  xxxxxxx                                               |
 | Nattharat Noophet    |  #9   |  2022              |  xxxxxxx                                                        |
 | Witchuta Sangfa      |  #9   |  2022              |  xxxxxxx                                                        |
 | Teeratorn Tukraiwong | #8    |  2021              | Data engineer at Sentrics consulting company limited     |
