@@ -1,0 +1,1668 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Broken Pipeline Lab: interactive CPE312 demo of ML pipeline flaws (leakage, splits, thresholds, drift).">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Broken Pipeline Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an audit workbench. Scoreboard strip on top (claimed vs reality vs next month),
+   then the pipeline + flaw switches on the left and the evidence panels on the right.
+   A step-by-step guide docks at the bottom right and highlights the zone it talks about. */
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef1f4;
+  --ink: #12171d;
+  --ink-2: #4a5562;
+  --ink-3: #7c8794;
+  --rule: #dde2e8;
+  --rule-strong: #c4ccd5;
+  --accent: #1f5fbf;
+  --accent-soft: #e3ecfa;
+  --flaw: #c4352f;
+  --flaw-soft: #fbe9e7;
+  --fixed: #127a3a;
+  --fixed-soft: #e3f3e8;
+  --warn: #9a6400;
+  --warn-soft: #fbf0d9;
+  --s1: #2a78d6; /* reported / test */
+  --s2: #eb6834; /* Jan 2026 */
+  --s3: #1baf7a; /* Feb 2026 */
+  --grid: #e6e9ed;
+  --shadow: 0 1px 2px rgba(18,23,29,.06), 0 4px 16px rgba(18,23,29,.05);
+  --dock-shadow: 0 8px 32px rgba(18,23,29,.18);
+  --f-display: "IBM Plex Sans Condensed", "IBM Plex Sans Thai", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "IBM Plex Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", "IBM Plex Sans Thai", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1216; --surface: #161c22; --surface-2: #1d252d; --ink: #edf1f5; --ink-2: #b4bec9; --ink-3: #85909c;
+    --rule: #28313a; --rule-strong: #38434e; --accent: #6ea3f0; --accent-soft: #1a2b45;
+    --flaw: #f0716a; --flaw-soft: #3a1f1f; --fixed: #4cc77a; --fixed-soft: #15301f; --warn: #e2a93b; --warn-soft: #33280f;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #232b33; --shadow: 0 1px 2px rgba(0,0,0,.3); --dock-shadow: 0 8px 32px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1216; --surface: #161c22; --surface-2: #1d252d; --ink: #edf1f5; --ink-2: #b4bec9; --ink-3: #85909c;
+  --rule: #28313a; --rule-strong: #38434e; --accent: #6ea3f0; --accent-soft: #1a2b45;
+  --flaw: #f0716a; --flaw-soft: #3a1f1f; --fixed: #4cc77a; --fixed-soft: #15301f; --warn: #e2a93b; --warn-soft: #33280f;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #232b33; --shadow: 0 1px 2px rgba(0,0,0,.3); --dock-shadow: 0 8px 32px rgba(0,0,0,.55);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+html[lang="th"] body { line-height: 1.65; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 120px; display: grid; gap: 20px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: .005em; }
+h1 { font-size: 30px; font-weight: 700; line-height: 1.15; }
+h2 { font-size: 19px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+html[lang="th"] .eyebrow { letter-spacing: .02em; font-size: 12.5px; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header */
+header.top { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: end; justify-content: space-between; }
+header.top .title { display: grid; gap: 6px; min-width: 0; max-width: 700px; }
+header.top .lede { color: var(--ink-2); font-size: 15px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 7px 12px; cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
+.seg button + button { border-left: 1px solid var(--rule-strong); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.seg button:disabled { opacity: .45; cursor: default; }
+.btn { border: 1px solid var(--rule-strong); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 13.5px; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.preset-bad[aria-pressed="true"] { background: var(--flaw); border-color: var(--flaw); color: #fff; }
+.btn.preset-good[aria-pressed="true"] { background: var(--fixed); border-color: var(--fixed); color: #fff; }
+.btn.guide-btn { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+.check input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* zone numbers */
+.zone { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--surface); font-family: var(--f-mono); font-size: 13px; font-weight: 600; flex: none; }
+.zone-head { display: flex; align-items: center; gap: 10px; }
+
+/* scoreboard */
+.board { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.board-head { grid-column: 1 / -1; padding: 14px 20px 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; justify-content: space-between; }
+.board .cell { padding: 14px 20px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; position: relative; }
+.board .cell + .cell { border-left: 1px solid var(--rule); }
+.board .label { display: flex; align-items: center; gap: 8px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.big { font-family: var(--f-mono); font-size: 44px; font-weight: 500; line-height: 1.05; letter-spacing: -.02em; }
+.big .unit { font-size: 15px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; margin-left: 6px; }
+.acc { font-family: var(--f-mono); font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.acc .unit { font-size: 12.5px; color: var(--ink-3); font-weight: 400; margin-left: 4px; }
+.sub { font-size: 13.5px; color: var(--ink-2); }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--f-mono); font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.chip.bad { background: var(--flaw-soft); color: var(--flaw); border-color: color-mix(in srgb, var(--flaw) 30%, transparent); }
+.chip.good { background: var(--fixed-soft); color: var(--fixed); border-color: color-mix(in srgb, var(--fixed) 30%, transparent); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.chip.neutral { background: var(--surface-2); color: var(--ink-2); border-color: var(--rule); }
+.busy { position: absolute; top: 12px; right: 16px; }
+.locked { display: grid; gap: 10px; }
+.predict-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.predict-row label { display: grid; gap: 3px; font-size: 12px; color: var(--ink-3); }
+.predict-row input { width: 92px; padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--surface); font-family: var(--f-mono); }
+.board-foot { grid-column: 1 / -1; border-top: 1px solid var(--rule); overflow-x: auto; }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+table.cmp th, table.cmp td { padding: 7px 14px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+table.cmp th:first-child, table.cmp td:first-child { text-align: left; font-family: var(--f-body); }
+table.cmp thead th { font-family: var(--f-mono); font-weight: 500; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+table.cmp tbody tr:last-child td { border-bottom: 0; }
+table.cmp td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+table.cmp td.hidden-metric { color: var(--ink-3); font-family: var(--f-body); font-style: italic; }
+table.cmp td .hint { font-family: var(--f-body); color: var(--ink-3); font-size: 12px; }
+
+/* main grid */
+.main { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 20px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); min-width: 0; }
+.panel-head { padding: 16px 18px 0; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; justify-content: space-between; }
+.panel-body { padding: 14px 18px 18px; }
+.diagram { overflow-x: auto; }
+.diagram svg { display: block; min-width: 720px; width: 100%; height: auto; }
+.diagram text { font-family: var(--f-body); }
+.legend-line { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend-line span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* flaw cards */
+.flaw-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface-2); }
+.flaw-bar .count { font-size: 13.5px; color: var(--ink-2); }
+.flaw-bar .count b { font-family: var(--f-mono); color: var(--ink); }
+.flaw-bar .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn.all-on { color: var(--flaw); border-color: color-mix(in srgb, var(--flaw) 45%, var(--rule-strong)); }
+.btn.all-off { color: var(--fixed); border-color: color-mix(in srgb, var(--fixed) 45%, var(--rule-strong)); }
+.flaws { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.flaw { border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; align-content: start; background: var(--surface); transition: border-color .2s, background-color .2s; }
+.flaw.on { border-color: color-mix(in srgb, var(--flaw) 45%, var(--rule)); background: linear-gradient(var(--flaw-soft), var(--flaw-soft)) top / 100% 3px no-repeat, var(--surface); }
+.flaw .row1 { display: flex; gap: 10px; align-items: start; justify-content: space-between; }
+.flaw .code { font-family: var(--f-mono); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.flaw.on .code { color: var(--flaw); }
+.flaw h3 { font-size: 15.5px; line-height: 1.3; }
+.flaw .what { font-size: 13.5px; color: var(--ink-2); }
+.flaw .fix { font-size: 13px; color: var(--ink-2); border-top: 1px dashed var(--rule); padding-top: 7px; }
+.flaw .fix b { color: var(--fixed); font-weight: 600; }
+.flaw .readout { font-family: var(--f-mono); font-size: 12.5px; padding: 6px 8px; border-radius: 6px; background: var(--surface-2); color: var(--ink); }
+.flaw .note { font-size: 12.5px; color: var(--ink-3); }
+.tag { font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; }
+.switch { position: relative; width: 42px; height: 24px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.switch .track { position: absolute; inset: 0; border-radius: 999px; background: var(--fixed); transition: background-color .2s; }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.switch input:checked ~ .track { background: var(--flaw); }
+.switch input:checked ~ .knob { transform: translateX(18px); }
+.switch input:focus-visible ~ .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.state-word { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.flaw.on .state-word { color: var(--flaw); }
+.flaw:not(.on) .state-word { color: var(--fixed); }
+.ask { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; font-size: 13px; }
+.ask .opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ask .opts button { border: 1px solid var(--accent); background: var(--surface); color: var(--accent); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12.5px; }
+.verdict { font-size: 13px; padding: 7px 10px; border-radius: 8px; background: var(--surface-2); }
+
+/* tabs */
+.tabs { display: flex; gap: 2px; overflow-x: auto; padding: 12px 12px 0; border-bottom: 1px solid var(--rule); }
+.tabs button { border: 0; background: transparent; padding: 8px 10px 9px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.tabs .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--flaw); }
+.tabpanel { padding: 16px 18px 18px; display: grid; gap: 12px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--f-mono); font-size: 11px; fill: var(--ink-3); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--surface); font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 5; line-height: 1.4; }
+.explain { font-size: 13.5px; color: var(--ink-2); }
+.explain b { color: var(--ink); font-weight: 600; }
+.slider-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
+.slider-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.cm { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; font-size: 13px; }
+.cm .h { font-size: 12px; color: var(--ink-3); align-self: end; padding: 2px 4px; }
+.cm .rh { font-size: 12px; color: var(--ink-3); align-self: center; padding-right: 6px; text-align: right; }
+.cm .c { border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.cm .c .v { font-family: var(--f-mono); font-size: 22px; font-weight: 500; }
+.cm .c .k { font-size: 12.5px; }
+.cm .tp { background: var(--fixed-soft); } .cm .tp .k { color: var(--fixed); }
+.cm .fn { background: var(--flaw-soft); } .cm .fn .k { color: var(--flaw); }
+.cm .fp { background: var(--warn-soft); } .cm .fp .k { color: var(--warn); }
+.cm .tn { background: var(--surface-2); } .cm .tn .k { color: var(--ink-2); }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.kv div { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; display: grid; gap: 1px; }
+.kv .k { font-size: 12px; color: var(--ink-3); }
+.kv .v { font-family: var(--f-mono); font-size: 17px; }
+.monitor { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.monitor div { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 7px 10px; font-size: 13px; border-bottom: 1px solid var(--rule); align-items: center; }
+.monitor div:last-child { border-bottom: 0; }
+.monitor .chip { white-space: normal; }
+footer { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; align-items: center; }
+footer label.check { font-size: 14px; color: var(--ink-2); gap: 10px; }
+footer .check input#seed { width: 140px; height: auto; min-height: 38px; padding: 6px 10px; font-size: 16px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); }
+
+/* highlight for the guide */
+.hl { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 12px; animation: pulse 1.6s ease-in-out 2; }
+@keyframes pulse { 50% { outline-color: color-mix(in srgb, var(--accent) 25%, transparent); } }
+
+/* guide dock */
+.dock { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(430px, calc(100vw - 32px)); max-height: min(74vh, 640px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 14px; box-shadow: var(--dock-shadow); z-index: 50; overflow: hidden; }
+.dock-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--ink); color: var(--surface); }
+.dock-head .eyebrow { color: color-mix(in srgb, var(--surface) 75%, transparent); }
+.dock-head button { border: 0; background: transparent; color: var(--surface); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; }
+.dock-head button:hover { background: color-mix(in srgb, var(--surface) 15%, transparent); }
+.dock-prog { display: flex; gap: 3px; padding: 10px 14px 0; }
+.dock-prog button { flex: 1; height: 6px; border: 0; padding: 0; border-radius: 3px; background: var(--rule); cursor: pointer; }
+.dock-prog button.done { background: color-mix(in srgb, var(--accent) 45%, var(--rule)); }
+.dock-prog button.cur { background: var(--accent); }
+.dock-body { overflow-y: auto; padding: 12px 14px; display: grid; gap: 10px; align-content: start; }
+.dock-body h3 { font-size: 18px; }
+.gsec { display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 14px; }
+.gsec .k { font-size: 11.5px; font-weight: 600; border-radius: 4px; padding: 1px 6px; align-self: start; margin-top: 2px; white-space: nowrap; }
+.gsec.do .k { background: var(--accent-soft); color: var(--accent); }
+.gsec.look .k { background: var(--warn-soft); color: var(--warn); }
+.gsec.why .k { background: var(--fixed-soft); color: var(--fixed); }
+.gsec p, .gsec ul { margin: 0; color: var(--ink); }
+.gsec ul { padding-left: 18px; display: grid; gap: 4px; }
+.gsec b { font-weight: 600; }
+.dock-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 10px 14px; border-top: 1px solid var(--rule); background: var(--surface-2); }
+.dock-foot .r { display: flex; gap: 8px; }
+.gloss { border: 1px solid var(--rule); border-radius: 8px; font-size: 13.5px; }
+.gloss summary { cursor: pointer; padding: 6px 10px; color: var(--ink-2); }
+.gloss dl { margin: 0; padding: 0 10px 8px; display: grid; gap: 6px; }
+.gloss dt { font-family: var(--f-mono); font-weight: 600; font-size: 12.5px; }
+.gloss dd { margin: 0; color: var(--ink-2); }
+.dock-pill { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 10px 16px; font-weight: 600; box-shadow: var(--dock-shadow); cursor: pointer; }
+
+@media (max-width: 1020px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .main .panel.sticky { position: static !important; }
+}
+@media (max-width: 760px) {
+  .board { grid-template-columns: minmax(0, 1fr); }
+  .board .cell + .cell { border-left: 0; border-top: 1px solid var(--rule); }
+  .flaws { grid-template-columns: minmax(0, 1fr); }
+  .big { font-size: 38px; }
+  h1 { font-size: 26px; }
+  .wrap { padding-inline: 16px; }
+  .dock { right: 8px; left: 8px; width: auto; max-height: 58vh; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <span class="eyebrow">CPE312 Data Science · Lecture 7 · ML models</span>
+      <h1>Broken Pipeline Lab <span class="muted" style="font-weight:500;font-size:.7em" data-i="subtitle"></span></h1>
+      <p class="lede" data-i="lede"></p>
+    </div>
+    <div class="controls">
+      <button class="btn guide-btn" id="open-guide" data-i="openGuide"></button>
+      <div class="seg" role="group" aria-label="Language">
+        <button id="lang-th" aria-pressed="true">ไทย</button>
+        <button id="lang-en" aria-pressed="false">EN</button>
+      </div>
+    </div>
+    <div class="controls" style="flex-basis:100%">
+      <button class="btn preset-bad" id="preset-consultant" aria-pressed="true" data-i="presetBad"></button>
+      <button class="btn preset-good" id="preset-auditor" aria-pressed="false" data-i="presetGood"></button>
+      <div class="seg" role="group" aria-label="Model">
+        <button id="model-lr" aria-pressed="true">Logistic regression</button>
+        <button id="model-knn" aria-pressed="false">k-NN</button>
+      </div>
+      <label class="check"><input type="checkbox" id="predict-first"> <span data-i="predictFirst"></span></label>
+    </div>
+  </header>
+
+  <section class="board" id="board" aria-label="Scoreboard">
+    <div class="board-head"><div class="zone-head"><span class="zone">1</span><h2 data-i="zone1"></h2></div><span class="small muted" data-i="zone1sub"></span></div>
+    <div class="cell" id="cell-reported">
+      <div class="label"><span class="swatch" style="background:var(--s1)"></span><span class="eyebrow" data-i="repLabel"></span></div>
+      <div class="big" id="rep-big">–</div>
+      <div class="acc" id="rep-acc"></div>
+      <div class="sub" id="rep-sub"></div>
+      <div id="rep-chip"></div>
+      <span class="busy chip neutral" id="busy" hidden data-i="busy"></span>
+    </div>
+    <div class="cell" id="cell-today">
+      <div class="label"><span class="swatch" style="background:var(--s2)"></span><span class="eyebrow" data-i="todayLabel"></span></div>
+      <div class="big" id="today-big">–</div>
+      <div class="acc" id="today-acc"></div>
+      <div class="sub" id="today-sub"></div>
+      <div id="today-chip"></div>
+    </div>
+    <div class="cell" id="cell-next">
+      <div class="label"><span class="swatch" style="background:var(--s3)"></span><span class="eyebrow" data-i="nextLabel"></span></div>
+      <div id="next-locked" class="locked">
+        <p class="sub" data-i="nextLocked"></p>
+        <div class="predict-row">
+          <label for="pred-prauc">PR-AUC<input id="pred-prauc" inputmode="decimal" placeholder="0.15"></label>
+          <label for="pred-recall">Recall %<input id="pred-recall" inputmode="decimal" placeholder="40"></label>
+          <button class="btn primary" id="release" data-i="release"></button>
+        </div>
+      </div>
+      <div id="next-open" hidden>
+        <div class="big" id="next-big">–</div>
+        <div class="acc" id="next-acc"></div>
+        <div class="sub" id="next-sub"></div>
+        <div id="next-chip"></div>
+        <button class="btn" id="relock" style="justify-self:start;margin-top:4px" data-i="relock"></button>
+      </div>
+    </div>
+    <div class="board-foot">
+      <table class="cmp" id="cmp">
+        <thead><tr><th data-i="thMetric"></th><th data-i="thRep"></th><th data-i="thJan"></th><th data-i="thFeb"></th><th data-i="thBase"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="main">
+    <section class="panel" id="pipe-panel" aria-labelledby="pipe-h">
+      <div class="panel-head">
+        <div class="zone-head"><span class="zone">2</span><h2 id="pipe-h" data-i="zone2"></h2></div>
+        <div class="legend-line"><span><span class="swatch" style="background:var(--flaw)"></span><span data-i="lgFlaw"></span></span><span><span class="swatch" style="background:var(--fixed)"></span><span data-i="lgFixed"></span></span><span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--flaw)" stroke-width="2" stroke-dasharray="4 3"/></svg><span data-i="lgLeak"></span></span></div>
+      </div>
+      <div class="panel-body" style="display:grid;gap:16px">
+        <div class="diagram" id="diagram"></div>
+        <div class="flaw-bar" id="flaw-bar">
+          <span class="count" id="flaw-count"></span>
+          <div class="acts">
+            <button class="btn all-on" id="all-on" data-i="allOn"></button>
+            <button class="btn all-off" id="all-off" data-i="allOff"></button>
+          </div>
+        </div>
+        <div class="flaws" id="flaws"></div>
+      </div>
+    </section>
+
+    <section class="panel sticky" id="ev-panel" aria-labelledby="ev-h" style="position:sticky;top:calc(env(safe-area-inset-top, 0px) + 12px)">
+      <div class="panel-head"><div class="zone-head"><span class="zone">3</span><h2 id="ev-h" data-i="zone3"></h2></div><span class="small muted" id="ev-sub"></span></div>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="tabpanel" id="tabpanel" role="tabpanel"></div>
+    </section>
+  </div>
+
+  <footer>
+    <span data-i="footer"></span>
+    <label class="check" for="seed"><span data-i="seed"></span> <input id="seed" type="number" value="11" min="1" max="999"></label>
+  </footer>
+</div>
+
+<aside class="dock" id="dock" aria-label="Guide" hidden>
+  <div class="dock-head"><span class="eyebrow" id="dock-step"></span><button id="dock-min" data-i="minimize"></button></div>
+  <div class="dock-prog" id="dock-prog"></div>
+  <div class="dock-body" id="dock-body"></div>
+  <div class="dock-foot">
+    <button class="btn" id="g-do" data-i="doIt"></button>
+    <div class="r"><button class="btn" id="g-prev" data-i="prev"></button><button class="btn primary" id="g-next" data-i="next"></button></div>
+  </div>
+</aside>
+<button class="dock-pill" id="dock-pill" hidden></button>
+
+<script id="engine-src">
+// Broken Pipeline Lab engine: synthetic telecom churn data + flawed/honest pipelines.
+var Engine = (() => {
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function makeRng(seed) {
+    const u = mulberry32(seed);
+    let spare = null;
+    const r = {
+      u,
+      n() {
+        if (spare !== null) { const s = spare; spare = null; return s; }
+        let a = 0, b = 0;
+        while (a === 0) a = u();
+        b = u();
+        const m = Math.sqrt(-2 * Math.log(a));
+        spare = m * Math.sin(2 * Math.PI * b);
+        return m * Math.cos(2 * Math.PI * b);
+      },
+      pois(l) { let L = Math.exp(-l), k = 0, p = 1; do { k++; p *= u(); } while (p > L); return k - 1; },
+      pick(ws) { let x = u() * ws.reduce((a, b) => a + b, 0); for (let i = 0; i < ws.length; i++) { x -= ws[i]; if (x <= 0) return i; } return ws.length - 1; },
+    };
+    return r;
+  }
+  const sig = (z) => 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))));
+
+  const GP = { b0: -4.6, d0: 1.2, d1: -0.4, c0: 0.1, c1: 0.6, u: 0.2, u1: 1.3, tb: -0.45, n0: -5.7, billMu: 6.85, nHist: 20000, nEval: 6000 };
+  const SURVEY = 30;
+  const FEATURES = [
+    'tenure_months', 'monthly_bill_thb', 'household_income_thb', 'age', 'data_usage_gb',
+    'dropped_calls_pct', 'device_age_months', 'support_tickets_90d', 'late_payments_6m',
+    'contract_month_to_month', 'contract_24_month', 'plan_fiber_bundle', 'plan_5g',
+  ];
+  for (let i = 1; i <= SURVEY; i++) FEATURES.push('survey_q' + i);
+  FEATURES.push('retention_team_calls');
+  const LEAK = FEATURES.length - 1;
+  const IDX = Object.fromEntries(FEATURES.map((f, i) => [f, i]));
+  const MONTHS = 48; // Jan 2022 .. Dec 2025; 48 = Jan 2026
+  const monthLabel = (m) => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m % 12] + ' ' + (2022 + Math.floor(m / 12));
+
+  // kind: 'history' | 'today' | 'next'
+  function generate(seed, nAccounts, kind) {
+    const rng = makeRng(seed);
+    const X = [], y = [], acct = [], month = [], plan = [];
+    for (let a = 0; a < nAccounts; a++) {
+      let m;
+      if (kind === 'history') m = Math.floor(rng.u() * MONTHS);
+      else if (kind === 'today') m = 48;
+      else m = 49;
+      const t = m / 47;
+      const shifted = kind === 'next';
+      const age = Math.max(18, Math.min(80, 40 + 12 * rng.n()));
+      const income = Math.exp(Math.log(38000) + 0.5 * rng.n()) * (shifted ? 0.78 : 1);
+      const contract = rng.pick([45, 35, 20]); // 0 m2m, 1 12mo, 2 24mo
+      let p = shifted ? rng.pick([40, 22, 13, 25]) : rng.pick([55, 30, 15]); // 3 = 5G Unlimited (new)
+      const lines = Math.min(5, 1 + rng.pois(0.6));
+      const planBase = [450, 900, 750, 690][p];
+      const bill = planBase * Math.exp(0.3 * rng.n()) * (1 + 0.4 * (lines - 1));
+      const tenure = Math.floor(-30 * Math.log(1 - rng.u() * 0.999));
+      const late = rng.pois(0.35 + (income < 25000 ? 0.7 : 0));
+      const tickets = rng.pois(0.5 + (shifted ? 0.2 : 0));
+      const survey = []; for (let i = 0; i < SURVEY; i++) survey.push(rng.n());
+      const net = 0.7 * rng.n();
+      const u = rng.n();
+      const lineRows = [];
+      let dropSum = 0, dataSum = 0;
+      for (let l = 0; l < lines; l++) {
+        const data = Math.exp(Math.log(15) + 0.6 * rng.n());
+        const dropped = Math.max(0, 1.5 + net + 0.4 * rng.n());
+        const dev = Math.floor(rng.u() * 48);
+        dropSum += dropped; dataSum += Math.log(data);
+        lineRows.push([data, dropped, dev]);
+      }
+      const zDrop = (dropSum / lines - 1.55) / 0.8;
+      const zData = (dataSum / lines - Math.log(15)) / 0.6;
+      const zTen = (Math.log1p(tenure) - 3.0) / 1.1;
+      const zBill = (Math.log(bill) - GP.billMu) / 0.42;
+      const zInc = (Math.log(income) - Math.log(38000)) / 0.5;
+      let L;
+      if (!shifted) {
+        // slow drift: price sensitivity rises, network complaints matter less
+        const cB = GP.c0 + GP.c1 * t, cD = GP.d0 + GP.d1 * t;
+        L = GP.b0 + GP.tb * t * t + cD * zDrop + 0.45 * (tickets - 0.5) / 0.7 - 0.6 * zTen
+          + (contract === 0 ? 1.0 : 0) - (contract === 2 ? 0.4 : 0) + 0.4 * (late - 0.5) / 0.8
+          + cB * (zBill + 0.38) - 0.25 * zData + (GP.u + GP.u1 * t) * u;
+      } else {
+        // competitor launch + downturn: contract buy-outs, price shock, new plan type
+        L = GP.n0 + 0.1 * zDrop + 0.45 * (tickets - 0.5) / 0.7
+          + 0.4 * (late - 0.5) / 0.8
+          + 1.8 * (zBill + 0.38) - 0.9 * zInc + (p === 3 ? 0.9 : 0) + 1.4 * u;
+      }
+      const yy = rng.u() < sig(L) ? 1 : 0;
+      let calls = 0;
+      if (kind === 'history') {
+        if (yy) calls = rng.u() < 0.92 ? 1 + rng.pois(1.3) : 0;
+        else calls = rng.u() < 0.012 ? 1 : 0;
+      }
+      for (const [data, dropped, dev] of lineRows) {
+        const row = [tenure, bill, income, age, data, dropped, dev, tickets, late,
+          contract === 0 ? 1 : 0, contract === 2 ? 1 : 0, p === 1 ? 1 : 0, p === 2 ? 1 : 0, ...survey, calls];
+        X.push(row); y.push(yy); acct.push(a); month.push(m); plan.push(p);
+      }
+    }
+    return { X, y, acct, month, plan };
+  }
+
+  // ---------- metrics ----------
+  function avgPrecision(y, s) {
+    const idx = s.map((v, i) => i).sort((a, b) => s[b] - s[a]);
+    const P = y.reduce((a, b) => a + b, 0); if (!P) return 0;
+    let tp = 0, fp = 0, ap = 0, i = 0;
+    while (i < idx.length) {
+      let j = i, dtp = 0, dfp = 0;
+      while (j < idx.length && s[idx[j]] === s[idx[i]]) { if (y[idx[j]]) dtp++; else dfp++; j++; }
+      tp += dtp; fp += dfp;
+      ap += (dtp / P) * (tp / (tp + fp));
+      i = j;
+    }
+    return ap;
+  }
+  function prCurve(y, s) {
+    const idx = s.map((v, i) => i).sort((a, b) => s[b] - s[a]);
+    const P = y.reduce((a, b) => a + b, 0);
+    const pts = [{ r: 0, p: 1 }];
+    let tp = 0, fp = 0, i = 0;
+    while (i < idx.length) {
+      let j = i;
+      while (j < idx.length && s[idx[j]] === s[idx[i]]) { if (y[idx[j]]) tp++; else fp++; j++; }
+      pts.push({ r: tp / P, p: tp / (tp + fp) });
+      i = j;
+    }
+    // thin to <= 200 points
+    if (pts.length > 200) { const st = pts.length / 200; const out = []; for (let k = 0; k < 200; k++) out.push(pts[Math.floor(k * st)]); out.push(pts[pts.length - 1]); return out; }
+    return pts;
+  }
+  function rocAuc(y, s) {
+    const idx = s.map((v, i) => i).sort((a, b) => s[a] - s[b]);
+    let rank = 0, sumPos = 0, P = 0, i = 0;
+    while (i < idx.length) {
+      let j = i; while (j < idx.length && s[idx[j]] === s[idx[i]]) j++;
+      const avg = (i + j + 1) / 2;
+      for (let k = i; k < j; k++) if (y[idx[k]]) { sumPos += avg; P++; }
+      i = j;
+    }
+    const N = y.length - P; if (!P || !N) return 0.5;
+    return (sumPos - P * (P + 1) / 2) / (P * N);
+  }
+  function confusion(y, s, th) {
+    let tp = 0, fp = 0, tn = 0, fn = 0;
+    for (let i = 0; i < y.length; i++) { const p = s[i] >= th; if (p && y[i]) tp++; else if (p) fp++; else if (y[i]) fn++; else tn++; }
+    return { tp, fp, tn, fn };
+  }
+  const COST_FN = 8000, COST_FP = 500;
+  function metrics(y, s, th) {
+    const c = confusion(y, s, th), n = y.length;
+    let ll = 0; for (let i = 0; i < n; i++) { const p = Math.min(1 - 1e-6, Math.max(1e-6, s[i])); ll -= y[i] ? Math.log(p) : Math.log(1 - p); }
+    const rate = (c.tp + c.fn) / n;
+    return {
+      n, rate, th, ...c,
+      accuracy: (c.tp + c.tn) / n,
+      precision: c.tp + c.fp ? c.tp / (c.tp + c.fp) : 0,
+      recall: c.tp + c.fn ? c.tp / (c.tp + c.fn) : 0,
+      prauc: avgPrecision(y, s), rocauc: rocAuc(y, s), logloss: ll / n,
+      costPer1000: (c.fn * COST_FN + c.fp * COST_FP) / n * 1000,
+      per1000: { caught: c.tp / n * 1000, missed: c.fn / n * 1000, wasted: c.fp / n * 1000 },
+    };
+  }
+  function baseline(y) {
+    const n = y.length, P = y.reduce((a, b) => a + b, 0), r = P / n;
+    return { accuracy: 1 - r, prauc: r, recall: 0, precision: 0, logloss: -(r * Math.log(r) + (1 - r) * Math.log(1 - r)), costPer1000: r * COST_FN * 1000, rate: r };
+  }
+  function bestCostThreshold(y, s) {
+    let best = 0.5, bc = Infinity;
+    for (let k = 1; k <= 99; k++) {
+      const th = k / 100, c = confusion(y, s, th), cost = c.fn * COST_FN + c.fp * COST_FP;
+      if (cost < bc) { bc = cost; best = th; }
+    }
+    return best;
+  }
+  function reliability(y, s, bins = 10) {
+    const out = []; for (let b = 0; b < bins; b++) out.push({ n: 0, p: 0, y: 0 });
+    for (let i = 0; i < y.length; i++) { const b = Math.min(bins - 1, Math.floor(s[i] * bins)); out[b].n++; out[b].p += s[i]; out[b].y += y[i]; }
+    let ece = 0;
+    const pts = out.map((o, b) => { if (o.n) ece += Math.abs(o.p - o.y) ; return o.n ? { b, n: o.n, pred: o.p / o.n, obs: o.y / o.n } : null; }).filter(Boolean);
+    return { pts, ece: ece / y.length };
+  }
+
+  // ---------- preprocessing ----------
+  function fitScaler(X, rows, cols, rawCols) {
+    const mu = [], sd = [];
+    for (const c of cols) {
+      if (rawCols.has(c)) { mu.push(0); sd.push(1); continue; }
+      let s = 0, s2 = 0; for (const r of rows) { const v = X[r][c]; s += v; s2 += v * v; }
+      const m = s / rows.length; mu.push(m); sd.push(Math.sqrt(Math.max(1e-9, s2 / rows.length - m * m)));
+    }
+    return { cols, mu, sd };
+  }
+  // returns a flat row-major matrix { d, n, k }
+  function transform(sc, X, rows) {
+    const k = sc.cols.length, n = rows.length, d = new Float64Array(n * k);
+    for (let i = 0; i < n; i++) { const r = X[rows[i]], o = i * k; for (let j = 0; j < k; j++) d[o + j] = (r[sc.cols[j]] - sc.mu[j]) / sc.sd[j]; }
+    return { d, n, k };
+  }
+  function selectK(X, y, rows, cols, K) {
+    // univariate |correlation| with target (f_classif-like ranking)
+    let my = 0; for (const r of rows) my += y[r]; my /= rows.length;
+    const scores = cols.map((c) => {
+      let mx = 0; for (const r of rows) mx += X[r][c]; mx /= rows.length;
+      let sxy = 0, sxx = 0, syy = 0;
+      for (const r of rows) { const dx = X[r][c] - mx, dy = y[r] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+      return { c, s: sxx > 0 ? Math.abs(sxy / Math.sqrt(sxx * syy)) : 0 };
+    });
+    scores.sort((a, b) => b.s - a.s);
+    return { chosen: scores.slice(0, K).map((o) => o.c).sort((a, b) => a - b), scores };
+  }
+
+  // ---------- models ----------
+  function trainLR(Z, yy, opt, rng) {
+    const { d: D, n, k } = Z;
+    const w = new Float64Array(k), g = new Float64Array(k); let b = 0;
+    const Y = Uint8Array.from(yy);
+    let P = 0; for (let i = 0; i < n; i++) P += Y[i];
+    const wPos = opt.balanced ? (n - P) / Math.max(1, P) : 1;
+    const order = new Int32Array(n); for (let i = 0; i < n; i++) order[i] = i;
+    const batchLoss = [], epochLoss = [];
+    const bs = opt.batch || 128;
+    for (let ep = 0; ep < opt.epochs; ep++) {
+      for (let i = n - 1; i > 0; i--) { const j = Math.floor(rng.u() * (i + 1)); const t = order[i]; order[i] = order[j]; order[j] = t; }
+      for (let s0 = 0; s0 < n; s0 += bs) {
+        g.fill(0); let gb = 0, l = 0, wsum = 0;
+        const end = Math.min(n, s0 + bs);
+        for (let q = s0; q < end; q++) {
+          const i = order[q], o = i * k; let z = b; for (let j = 0; j < k; j++) z += w[j] * D[o + j];
+          const p = sig(z), wt = Y[i] ? wPos : 1, e = (p - Y[i]) * wt;
+          for (let j = 0; j < k; j++) g[j] += e * D[o + j]; gb += e; wsum += wt;
+          if (opt.track) { const pc = Math.min(1 - 1e-12, Math.max(1e-12, p)); l -= wt * (Y[i] ? Math.log(pc) : Math.log(1 - pc)); }
+        }
+        for (let j = 0; j < k; j++) w[j] -= opt.lr * (g[j] / wsum + opt.l2 * w[j]);
+        b -= opt.lr * gb / wsum;
+        if (opt.track) batchLoss.push(l / wsum);
+      }
+      if (opt.track) {
+        let l = 0, ws = 0;
+        for (let i = 0; i < n; i++) { const o = i * k; let z = b; for (let j = 0; j < k; j++) z += w[j] * D[o + j]; const p = Math.min(1 - 1e-12, Math.max(1e-12, sig(z))); const wt = Y[i] ? wPos : 1; l -= wt * (Y[i] ? Math.log(p) : Math.log(1 - p)); ws += wt; }
+        epochLoss.push(l / ws);
+      }
+    }
+    let diverged = false; for (let j = 0; j < k; j++) if (!isFinite(w[j]) || Math.abs(w[j]) > 1e3) diverged = true;
+    return { kind: 'lr', w, b, batchLoss, epochLoss, diverged };
+  }
+  function predictLR(m, Z) {
+    const { d: D, n, k } = Z, out = new Array(n);
+    for (let i = 0; i < n; i++) { const o = i * k; let z = m.b; for (let j = 0; j < k; j++) z += m.w[j] * D[o + j]; out[i] = sig(z); }
+    return out;
+  }
+
+  // k-NN: returns the labels of the maxK nearest training rows for each query row
+  function knnNeighbours(Ztr, ytr, Zq, maxK) {
+    const { d: T, n, k } = Ztr, Q = Zq.d, out = new Array(Zq.n);
+    const bestD = new Float64Array(maxK), bestY = new Uint8Array(maxK);
+    for (let q = 0; q < Zq.n; q++) {
+      const qo = q * k; bestD.fill(Infinity);
+      for (let i = 0; i < n; i++) {
+        const o = i * k; let d = 0;
+        for (let j = 0; j < k; j++) { const e = T[o + j] - Q[qo + j]; d += e * e; }
+        if (d >= bestD[maxK - 1]) continue;
+        let p = maxK - 1; while (p > 0 && bestD[p - 1] > d) { bestD[p] = bestD[p - 1]; bestY[p] = bestY[p - 1]; p--; }
+        bestD[p] = d; bestY[p] = ytr[i];
+      }
+      out[q] = bestY.slice();
+    }
+    return out;
+  }
+  function knnProba(nb, kk, wPos) {
+    return nb.map((lab) => { let pos = 0; for (let j = 0; j < kk; j++) pos += lab[j]; return (wPos * pos + 0.05) / (wPos * pos + (kk - pos) + 0.1); });
+  }
+
+  // ---------- pipeline ----------
+  function shuffle(arr, rng) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rng.u() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+  function randomSplit(ds, rows, frac, byAccount, rng) {
+    if (!byAccount) { const s = shuffle(rows.slice(), rng), cut = Math.floor(s.length * frac); return [s.slice(cut), s.slice(0, cut)]; }
+    const accts = shuffle([...new Set(rows.map((r) => ds.acct[r]))], rng);
+    const testA = new Set(accts.slice(0, Math.floor(accts.length * frac)));
+    return [rows.filter((r) => !testA.has(ds.acct[r])), rows.filter((r) => testA.has(ds.acct[r]))];
+  }
+
+  function build(seed) {
+    const hist = generate(seed, GP.nHist, 'history');
+    const today = generate(seed + 101, GP.nEval, 'today');
+    const next = generate(seed + 202, GP.nEval, 'next');
+    for (const d of [today, next]) for (const r of d.X) r[LEAK] = 0; // not known at scoring time
+    return { seed, hist, today, next };
+  }
+
+  const GRID_LR = [];
+  for (const K of [6, 10, 16]) for (const l2 of [0.0003, 0.01, 0.1]) GRID_LR.push({ K, l2 });
+  const GRID_KNN = [];
+  for (const k of [5, 15, 41]) GRID_KNN.push({ K: 10, k });
+
+  function run(world, cfg) {
+    const F = cfg.flaws; // {F1..F9: bool}
+    const ds = world.hist, n = ds.y.length;
+    const rng = makeRng(world.seed * 7 + 3);
+    let all = Array.from({ length: n }, (_, i) => i);
+    if (cfg.model === 'knn') all = all.filter((r) => ds.acct[r] < 5600); // k-NN is slow: use a 5,600-account sample
+    let train, test;
+    if (F.F6) [train, test] = randomSplit(ds, all, 0.25, !F.F8, rng);
+    else { train = all.filter((r) => ds.month[r] < 36); test = all.filter((r) => ds.month[r] >= 36); }
+    // inner validation (for honest tuning + threshold)
+    let itr, iva;
+    if (F.F6) [itr, iva] = randomSplit(ds, train, 0.25, !F.F8, rng);
+    else { itr = train.filter((r) => ds.month[r] < 24); iva = train.filter((r) => ds.month[r] >= 24); }
+
+    const trainAcc = new Set(train.map((r) => ds.acct[r]));
+    const sharedAccounts = new Set(test.map((r) => ds.acct[r]).filter((a) => trainAcc.has(a))).size;
+    const testAccounts = new Set(test.map((r) => ds.acct[r])).size;
+
+    const isKnn = cfg.model === 'knn';
+    const cap = (rows, m) => (isKnn && rows.length > m ? shuffle(rows.slice(), makeRng(5)).slice(0, m) : rows);
+        let cols = FEATURES.map((_, i) => i); if (!F.F2) cols = cols.filter((c) => c !== LEAK);
+    const rawCols = F.F3 ? new Set([IDX.household_income_thb, IDX.monthly_bill_thb]) : new Set();
+    const yv = ds.y;
+    const pick = (rows) => rows.map((r) => yv[r]);
+    const lrOpt = (l2, track) => ({ lr: F.F3 ? 1.0 : 0.2, l2, epochs: track ? 20 : 6, batch: 128, balanced: F.F9, track });
+    const wPos = F.F9 ? 20 : 1;
+
+    // fit preprocessing for a given "fit rows" (fit set) -> returns scaler on chosen K cols
+    function prep(fitRowsTrain, K) {
+      const fitRows = F.F1 ? all : fitRowsTrain; // F1: fitted on the full dataset
+      const sel = selectK(ds.X, yv, fitRows, cols, K);
+      const sc = fitScaler(ds.X, fitRows, sel.chosen, rawCols);
+      return { sel, sc };
+    }
+    const grid = cfg.model === 'knn' ? GRID_KNN : GRID_LR;
+    // score each config on the tuning target
+    const tuneOn = F.F7 ? test : iva;
+    const tuneFit = F.F7 ? train : itr;
+    const results = [];
+    const prepCache = {};
+    for (const g of grid) {
+      const key = g.K; if (!prepCache[key]) prepCache[key] = prep(tuneFit, g.K);
+      const { sc } = prepCache[key];
+      const Ztr = transform(sc, ds.X, tuneFit), Zte = transform(sc, ds.X, tuneOn);
+      let s;
+      if (cfg.model === 'knn') {
+        if (!prepCache[key].nb) prepCache[key].nb = knnNeighbours(Ztr, pick(tuneFit), Zte, 41);
+        s = knnProba(prepCache[key].nb, g.k, wPos);
+      } else {
+        const m = trainLR(Ztr, pick(tuneFit), lrOpt(g.l2, false), makeRng(11));
+        s = predictLR(m, Zte);
+      }
+      results.push({ g, score: avgPrecision(pick(tuneOn), s), s });
+    }
+    const gridList = results.map((r) => ({ ...r.g, score: r.score }));
+    results.sort((a, b) => b.score - a.score);
+    const chosen = results[0].g;
+    // threshold from inner validation with the chosen config (honest) — computed regardless
+    let valScores;
+    if (!F.F7) valScores = results[0].s; // already scored on the validation split
+    else {
+      const { sc } = prep(itr, chosen.K);
+      const Ztr = transform(sc, ds.X, itr), Zva = transform(sc, ds.X, iva);
+      if (cfg.model === 'knn') valScores = knnProba(knnNeighbours(Ztr, pick(itr), Zva, chosen.k), chosen.k, wPos);
+      else valScores = predictLR(trainLR(Ztr, pick(itr), lrOpt(chosen.l2, false), makeRng(11)), Zva);
+    }
+    const costTh = bestCostThreshold(pick(iva), valScores);
+    const threshold = F.F5 ? 0.5 : (cfg.threshold != null ? cfg.threshold : costTh);
+
+    // final fit on full training set
+    const { sel, sc } = prep(train, chosen.K);
+    const Ztr = transform(sc, ds.X, train);
+    const ytr = pick(train);
+    let model, scoreFn;
+    if (cfg.model === 'knn') {
+      scoreFn = (Z) => knnProba(knnNeighbours(Ztr, ytr, Z, chosen.k), chosen.k, wPos);
+      model = { kind: 'knn' };
+    } else {
+      model = trainLR(Ztr, ytr, lrOpt(chosen.l2, true), makeRng(11));
+      scoreFn = (Z) => predictLR(model, Z);
+    }
+    const allR = (d) => cap(Array.from({ length: d.y.length }, (_, i) => i), 2500);
+    const sTest = scoreFn(transform(sc, ds.X, test));
+    const rT = allR(world.today), rN = allR(world.next);
+    const yToday = rT.map((r) => world.today.y[r]), yNext = rN.map((r) => world.next.y[r]);
+    const sToday = scoreFn(transform(sc, world.today.X, rT));
+    const sNext = scoreFn(transform(sc, world.next.X, rN));
+    const yTest = pick(test);
+
+    // importance: |coef| share for LR, |corr| share for kNN
+    let importance;
+    if (model.kind === 'lr') {
+      const tot = Array.from(model.w).reduce((a, v) => a + Math.abs(isFinite(v) ? v : 0), 0) || 1;
+      importance = sel.chosen.map((c, j) => ({ f: FEATURES[c], v: Math.abs(isFinite(model.w[j]) ? model.w[j] : 0) / tot }));
+    } else {
+      const sm = sel.scores.filter((o) => sel.chosen.includes(o.c)); const tot = sm.reduce((a, o) => a + o.s, 0) || 1;
+      importance = sm.map((o) => ({ f: FEATURES[o.c], v: o.s / tot }));
+    }
+    importance.sort((a, b) => b.v - a.v);
+
+    return {
+      cfg, chosen, gridList, peeks: F.F7 ? grid.length : 1, gridSize: grid.length,
+      split: { train: train.length, test: test.length, trainMonths: monthRange(ds, train), testMonths: monthRange(ds, test), sharedAccounts, testAccounts, scalerSawTest: F.F1 ? test.length : 0 },
+      selected: sel.chosen.map((c) => FEATURES[c]),
+      costTh, classWeight: F.F9 ? (cfg.model === 'knn' ? wPos : (ytr.length - ytr.reduce((a, b) => a + b, 0)) / Math.max(1, ytr.reduce((a, b) => a + b, 0))) : 1,
+      loss: model.kind === 'lr' ? { batch: model.batchLoss, epoch: model.epochLoss, diverged: model.diverged, batchesPerEpoch: Math.ceil(train.length / 128) } : null,
+      importance,
+      scores: { test: sTest, yTest, today: sToday, yToday, next: sNext, yNext },
+    };
+  }
+  function monthRange(ds, rows) {
+    let lo = Infinity, hi = -Infinity; for (const r of rows) { lo = Math.min(lo, ds.month[r]); hi = Math.max(hi, ds.month[r]); }
+    return [lo, hi];
+  }
+
+  // ---------- drift ----------
+  function psi(train, cur, bins = 10) {
+    const s = train.slice().sort((a, b) => a - b);
+    const edges = []; for (let i = 1; i < bins; i++) edges.push(s[Math.floor(i * s.length / bins)]);
+    const uniq = [...new Set(edges)];
+    const hist = (arr) => { const h = new Array(uniq.length + 1).fill(0); for (const v of arr) { let b = 0; while (b < uniq.length && v > uniq[b]) b++; h[b]++; } return h.map((c) => Math.max(c / arr.length, 1e-4)); };
+    const a = hist(train), b = hist(cur);
+    let p = 0; for (let i = 0; i < a.length; i++) p += (b[i] - a[i]) * Math.log(b[i] / a[i]);
+    return p;
+  }
+  function drift(world, which) {
+    const ref = world.hist, cur = which === 'next' ? world.next : which === 'today' ? world.today : null;
+    const refRows = [], curX = [];
+    for (let i = 0; i < ref.y.length; i++) if (ref.month[i] < 36) refRows.push(ref.X[i]);
+    if (cur) cur.X.forEach((r) => curX.push(r));
+    else for (let i = 0; i < ref.y.length; i++) if (ref.month[i] >= 36) curX.push(ref.X[i]);
+    const feats = FEATURES.map((f, c) => ({ f, c })).filter((o) => o.c !== LEAK);
+    const out = feats.map(({ f, c }) => ({ f, psi: psi(refRows.map((r) => r[c]), curX.map((r) => r[c])) }));
+    out.sort((a, b) => b.psi - a.psi);
+    // adversarial validation: LR to tell reference rows from current rows (held-out AUC)
+    const rng = makeRng(99);
+    const X = [...refRows, ...curX], y = [...refRows.map(() => 0), ...curX.map(() => 1)];
+    const rows = shuffle(X.map((_, i) => i), rng), cut = Math.floor(rows.length * 0.7);
+    const tr = rows.slice(0, cut), te = rows.slice(cut);
+    const cols = feats.map((o) => o.c);
+    const sc = fitScaler(X, tr, cols, new Set());
+    const m = trainLR(transform(sc, X, tr), tr.map((r) => y[r]), { lr: 0.1, l2: 0.001, epochs: 15, batch: 128, balanced: true }, rng);
+    const auc = rocAuc(te.map((r) => y[r]), predictLR(m, transform(sc, X, te)));
+    let newPlan = 0; if (cur) newPlan = cur.plan.filter((p) => p === 3).length / cur.plan.length;
+    return { features: out, auc, newPlan };
+  }
+
+  return { GP, build, run, drift, FEATURES, LEAK, monthLabel, COST_FN, COST_FP, metrics, baseline, prCurve, reliability, confusion };
+})();
+if (typeof module !== 'undefined') module.exports = Engine;
+
+</script>
+<script>
+(() => {
+  const E = Engine;
+
+  // ================= text (Thai + English) =================
+  const THM = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const I = {
+    th: {
+      subtitle: 'ห้องทดลองไปป์ไลน์พัง',
+      lede: 'ที่ปรึกษาคนหนึ่งสร้างโมเดลทำนายลูกค้าที่จะย้ายค่าย (churn) ให้บริษัทมือถือ แล้วบอกว่า “พร้อมใช้งานจริง” แต่ในโน้ตบุ๊กมีข้อผิดพลาดซ่อนอยู่ 9 จุด (F1–F9) คุณคือทีมตรวจสอบ: ปิดข้อผิดพลาดทีละจุด แล้วดูว่าคะแนนที่โน้ตบุ๊กรายงานต่างจากผลจริงกับลูกค้าใหม่แค่ไหน ถ้าเพิ่งเข้ามาครั้งแรก กด “คู่มือทีละขั้น”',
+      openGuide: 'คู่มือทีละขั้น',
+      presetBad: 'โน้ตบุ๊กของที่ปรึกษา', presetGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', predictFirst: 'ให้ทายก่อนเฉลย',
+      zone1: 'ผลคะแนน: สิ่งที่รายงาน เทียบกับความจริง', zone1sub: 'เป้าหมายคือให้ช่องซ้ายใกล้ช่องกลางที่สุด ไม่ใช่ให้ช่องซ้ายสูงที่สุด',
+      zone2: 'ไปป์ไลน์ และสวิตช์ข้อผิดพลาด', zone3: 'หลักฐาน',
+      repLabel: 'สิ่งที่โน้ตบุ๊กรายงาน', todayLabel: 'ใช้งานจริง · ม.ค. 2026', nextLabel: 'เดือนถัดไป · ก.พ. 2026',
+      busy: 'กำลังเทรนใหม่…',
+      nextLocked: 'คู่แข่งเปิดแพ็กเกจ 5G ราคาถูก และรายได้ครัวเรือนลดลง ก่อนดูผล ให้ทายก่อนว่าโมเดลนี้จะได้คะแนนเท่าไร',
+      release: 'เปิดข้อมูล ก.พ.', relock: 'ซ่อนข้อมูล ก.พ. อีกครั้ง',
+      thMetric: 'ตัวชี้วัด', thRep: 'โน้ตบุ๊ก (test set)', thJan: 'ม.ค. 2026', thFeb: 'ก.พ. 2026', thBase: 'Baseline “ไม่มีใครย้าย”',
+      lgFlaw: 'มีข้อผิดพลาด', lgFixed: 'แก้แล้ว', lgLeak: 'ข้อมูลรั่ว (leakage)',
+      allOn: 'เปิดข้อผิดพลาดทั้งหมด', allOff: 'แก้ทั้งหมด',
+      count: (n, N) => `มีข้อผิดพลาด <b>${n}</b> จาก ${N} จุด`,
+      footer: 'ข้อมูลสังเคราะห์: 20,000 บัญชี (ราว 32,000 เบอร์) ม.ค. 2022 ถึง ธ.ค. 2025 อัตราย้ายค่ายราว 4.4% พลาดลูกค้าที่จะย้าย 1 คนเสียรายได้ ฿8,000 ส่งข้อเสนอให้คนที่ไม่ได้จะย้ายเสีย ฿500 ทุกตัวเลขคำนวณสดในเบราว์เซอร์ของคุณ',
+      seed: 'Dataset seed',
+      minimize: 'ย่อ ▾', doIt: 'ทำให้ดู', prev: '← ก่อนหน้า', next: 'ถัดไป →', finish: 'จบคู่มือ',
+      pill: (i, n) => `คู่มือ · ขั้น ${i}/${n}`, stepOf: (i, n) => `คู่มือทีละขั้น · ขั้น ${i}/${n}`,
+      kDo: 'ทำ', kLook: 'ดูตรงไหน', kWhy: 'ทำไมสำคัญ',
+      glossTitle: 'คำศัพท์ที่ใช้ในหน้านี้',
+      present: 'มีอยู่', fixed: 'แก้แล้ว', fix: 'วิธีแก้:',
+      notReported: 'ไม่ได้รายงาน', locked: 'ยังล็อก',
+      rows: ['Accuracy', 'PR-AUC', 'Recall (จับลูกค้าที่จะย้ายได้)', 'Precision (ข้อเสนอที่ส่งถูกคน)', 'Log loss', 'จับได้ ต่อ 1,000 คน', 'หลุดไป ต่อ 1,000 คน', 'ข้อเสนอเสียเปล่า ต่อ 1,000 คน', 'ต้นทุน ต่อลูกค้า 1,000 คน'],
+      accUnit: 'accuracy (ตัวชี้วัดของที่ปรึกษา)', accBig: '% accuracy',
+      repSubF4: (a, b) => `Test set ${a} ถึง ${b} · รายงานแค่ accuracy`,
+      repSub: (a, b, r, th) => `Test set ${a} ถึง ${b} · recall ${r} ที่ threshold ${th}`,
+      baseChipAcc: (v) => `Baseline ที่ทายว่าไม่มีใครย้าย: ${v}`,
+      baseChipPr: (v) => `Baseline PR-AUC ${v} (= อัตราการย้ายค่าย)`,
+      todaySub: (n, r, c) => `${n} เบอร์ใหม่ · recall ${r} · เสียหาย ${c} ต่อลูกค้า 1,000 คน`,
+      noCatch: 'แทบจับลูกค้าที่จะย้ายไม่ได้เลย',
+      over: (d) => `รายงานเกินจริง ${d}`, under: (d) => `รายงานต่ำกว่าจริง ${d}`, within: (d) => `ต่างจากรายงานไม่เกิน ${d}`,
+      nextSub: (r0, r1, rc, c) => `อัตราการย้าย ${r0} (เดิม ${r1}) · recall ${rc} · เสียหาย ${c} ต่อ 1,000 คน`,
+      predOk: (p) => `ที่คุณทาย ${p}: คลาดไม่เกิน ±0.10`, predOver: (p, e) => `ที่คุณทาย ${p}: มั่นใจเกินไป ${e}`, predUnder: (p, e) => `ที่คุณทาย ${p}: มองแง่ร้ายเกินไป ${e}`,
+      recOk: (p) => `ทาย recall ${p}%: คลาดไม่เกิน ±10 จุด`, recOff: (p, e) => `ทาย recall ${p}%: คลาด ${e} จุด`, noPred: 'ยังไม่ได้ใส่คำทาย',
+      ask: (on) => `ก่อนเทรนใหม่: เมื่อคุณ<b>${on ? 'เปิด' : 'ปิด'}</b>ข้อผิดพลาดนี้ คะแนนที่โน้ตบุ๊กรายงานจะ…`,
+      up: 'สูงขึ้น ↑', down: 'ลดลง ↓', same: 'เท่าเดิม ≈', cancel: 'ยกเลิก',
+      words: { up: 'สูงขึ้น', down: 'ลดลง', same: 'เท่าเดิม' },
+      right: 'ถูกต้อง', wrong: 'ยังไม่ใช่',
+      verdict: (g, b, n, k) => `คุณทายว่าคะแนนจะ${g} ผลจริง: ${k} เปลี่ยนจาก ${b} เป็น ${n}`,
+      evLR: 'Logistic regression', evKNN: 'k-NN บนตัวอย่าง 5,600 บัญชี',
+      tabs: { loss: 'Loss curve', pr: 'Precision–recall', cost: 'Threshold และต้นทุน', feat: 'ฟีเจอร์', calib: 'Calibration', drift: 'Drift' },
+    },
+    en: {
+      subtitle: '',
+      lede: 'A consultant built a churn model for a mobile operator and says it is ready to deploy. Their notebook hides nine mistakes (F1–F9). You are the audit team: switch the mistakes off one at a time and watch how far the score the notebook reports is from how the model really does on new customers. First time here? Press "Step-by-step guide".',
+      openGuide: 'Step-by-step guide',
+      presetBad: "Consultant's notebook", presetGood: 'Audited pipeline', predictFirst: 'Predict before reveal',
+      zone1: 'Scores: what is reported vs. what is real', zone1sub: 'The goal is to make the left column match the middle one, not to make the left one high.',
+      zone2: 'Pipeline and flaw switches', zone3: 'Evidence',
+      repLabel: 'What the notebook reports', todayLabel: 'Real deployment · Jan 2026', nextLabel: 'Next month · Feb 2026',
+      busy: 'Retraining…',
+      nextLocked: 'A rival operator launches a cheap 5G plan and incomes fall. Before you look, predict how this model will score.',
+      release: 'Release Feb data', relock: 'Hide Feb data again',
+      thMetric: 'Metric', thRep: 'Notebook (test)', thJan: 'Jan 2026', thFeb: 'Feb 2026', thBase: 'Always-"stays" baseline',
+      lgFlaw: 'flaw present', lgFixed: 'fixed', lgLeak: 'information leaking',
+      allOn: 'Turn all flaws on', allOff: 'Fix all flaws',
+      count: (n, N) => `<b>${n}</b> of ${N} flaws present`,
+      footer: 'Synthetic data: 20,000 accounts (about 32,000 phone lines), Jan 2022 to Dec 2025, about 4.4% churn. A missed churner costs ฿8,000 in lost revenue; a retention offer to someone who would have stayed costs ฿500. Every number is computed live in your browser.',
+      seed: 'Dataset seed',
+      minimize: 'Minimise ▾', doIt: 'Do it for me', prev: '← Back', next: 'Next →', finish: 'Finish',
+      pill: (i, n) => `Guide · step ${i}/${n}`, stepOf: (i, n) => `Step-by-step guide · step ${i}/${n}`,
+      kDo: 'Do', kLook: 'Look at', kWhy: 'Why it matters',
+      glossTitle: 'Terms used on this page',
+      present: 'present', fixed: 'fixed', fix: 'Fix:',
+      notReported: 'not reported', locked: 'locked',
+      rows: ['Accuracy', 'PR-AUC', 'Recall (churners caught)', 'Precision (offers that hit)', 'Log loss', 'Churners caught per 1,000', 'Churners missed per 1,000', 'Wasted offers per 1,000', 'Cost per 1,000 customers'],
+      accUnit: "accuracy (the consultant's metric)", accBig: '% accuracy',
+      repSubF4: (a, b) => `Test set, ${a} to ${b}. Only accuracy is reported.`,
+      repSub: (a, b, r, th) => `Test set, ${a} to ${b} · recall ${r} at threshold ${th}`,
+      baseChipAcc: (v) => `Baseline that predicts nobody leaves: ${v}`,
+      baseChipPr: (v) => `Baseline PR-AUC ${v} (the churn rate)`,
+      todaySub: (n, r, c) => `${n} new lines · recall ${r} · ${c} lost per 1,000 customers`,
+      noCatch: 'Catches almost no churners',
+      over: (d) => `Overstated by ${d}`, under: (d) => `Understated by ${d}`, within: (d) => `Within ${d} of the report`,
+      nextSub: (r0, r1, rc, c) => `Churn rate ${r0} (was ${r1}) · recall ${rc} · ${c} lost per 1,000`,
+      predOk: (p) => `Your estimate ${p}: within ±0.10`, predOver: (p, e) => `Your estimate ${p}: overconfident by ${e}`, predUnder: (p, e) => `Your estimate ${p}: too pessimistic by ${e}`,
+      recOk: (p) => `Recall guess ${p}%: within ±10 pts`, recOff: (p, e) => `Recall guess ${p}%: off by ${e} pts`, noPred: 'No prediction entered',
+      ask: (on) => `Before it retrains: when you turn this flaw <b>${on ? 'on' : 'off'}</b>, the score the notebook reports will…`,
+      up: 'go up ↑', down: 'go down ↓', same: 'stay ≈', cancel: 'cancel',
+      words: { up: 'go up', down: 'go down', same: 'stay about the same' },
+      right: 'Right.', wrong: 'Not quite.',
+      verdict: (g, b, n, k) => `You said the reported score would ${g}. ${k} went from ${b} to ${n}.`,
+      evLR: 'Logistic regression', evKNN: 'k-NN on a 5,600-account sample',
+      tabs: { loss: 'Loss curve', pr: 'Precision–recall', cost: 'Threshold & cost', feat: 'Features', calib: 'Calibration', drift: 'Drift' },
+    },
+  };
+  const FT = {
+    th: {
+      F1: { lab: 'Lab 1', title: 'Scaler และ SelectKBest ถูก fit ก่อนแบ่งข้อมูล', what: 'StandardScaler และ SelectKBest เรียนรู้ค่าเฉลี่ยและอันดับฟีเจอร์จากข้อมูลทุกแถว รวมถึงแถวใน test set ด้วย', fix: 'ใส่ทั้งสองขั้นไว้ใน Pipeline เพื่อให้เรียนรู้จากข้อมูล train เท่านั้น' },
+      F2: { lab: 'Lab 1', title: 'คอลัมน์ที่รู้ค่าได้หลังลูกค้าย้ายค่ายแล้วเท่านั้น', what: 'retention_team_calls ถูกบันทึกตอนลูกค้าโทรมาขอยกเลิก ณ วันที่โมเดลต้องตัดสินใจ ค่านี้จึงเป็น 0 เสมอ', fix: 'ตัดทุกคอลัมน์ที่ยังไม่รู้ค่า ณ เวลาที่ต้องทำนาย' },
+      F3: { lab: 'Lab 2', title: 'คอลัมน์เงินบาทไม่ได้ scale และ learning rate สูงเกินไป', what: 'รายได้และค่าบริการรายเดือนยังเป็นหน่วยบาทดิบ ขณะที่ learning rate = 1.0 และโน้ตบุ๊กพิมพ์เฉพาะ loss ของ mini-batch สุดท้าย', fix: 'scale ทุกอินพุต ลด learning rate และพล็อต loss ของทั้ง epoch' },
+      F4: { lab: 'Lab 5', title: 'ใช้ accuracy เป็นตัวชี้วัดเดียว', what: 'ลูกค้าย้ายค่ายแค่ราว 4% โมเดลที่ทายว่า “ไม่มีใครย้าย” ก็ได้ accuracy ราว 96% แล้ว', fix: 'รายงาน PR-AUC, recall และ confusion matrix เทียบกับ dummy baseline' },
+      F5: { lab: 'Lab 5', title: 'Threshold ค้างไว้ที่ 0.5', what: 'ลูกค้าจะได้ข้อเสนอรักษาฐานลูกค้า ก็ต่อเมื่อความน่าจะเป็นที่จะย้าย ≥ 0.5 ซึ่งแทบไม่เกิดขึ้น', fix: 'เลือก threshold ที่ทำให้ต้นทุนต่ำสุดบน validation data (พลาด 1 คน ฿8,000, ส่งข้อเสนอ ฿500)' },
+      F6: { lab: 'Lab 4', title: 'แบ่งข้อมูลแบบสุ่ม ทั้งที่ข้อมูลเรียงตามเวลา', what: 'สลับแถวปี 2022–2025 ก่อนแบ่ง test set จึงมาจากเดือนเดียวกับที่โมเดลเรียนไปแล้ว', fix: 'เทรนด้วยปี 2022–2024 แล้วทดสอบกับปี 2025 ให้เหมือนตอนใช้งานจริง' },
+      F7: { lab: 'Lab 4', title: 'จูน hyperparameter บน test set', what: 'ลอง 9 ค่า พิมพ์คะแนน test ทุกรอบ แล้วเลือกค่าที่ดีที่สุด', fix: 'จูนบน validation split ที่แยกจากข้อมูล train แล้วใช้ test set แค่ครั้งเดียว' },
+      F8: { lab: 'Lab 4', title: 'ลูกค้าคนเดียวกันอยู่ทั้งใน train และ test', what: 'แพ็กเกจครอบครัวมี 1–5 เบอร์ต่อบัญชี การแบ่งแบบรายแถวทำให้เบอร์ในบัญชีเดียวกันอยู่ทั้งสองฝั่ง', fix: 'แบ่งตาม account_id (GroupShuffleSplit หรือ GroupKFold)' },
+      F9: { lab: 'Lab 3 · โบนัส', title: 'Class weight ทำให้ความน่าจะเป็นเพี้ยน', what: "class_weight='balanced' เพิ่มน้ำหนักลูกค้าที่ย้ายค่าย ความน่าจะเป็นที่ทำนายจึงสูงเกินจริงมาก", fix: 'เทรนโดยไม่ใช้ weight หรือ calibrate ความน่าจะเป็นก่อนใช้คำนวณต้นทุน' },
+    },
+    en: {
+      F1: { lab: 'Lab 1', title: 'Scaler and feature selector fitted before the split', what: 'StandardScaler and SelectKBest learn their means and feature ranking from every row, test rows included.', fix: 'Put both inside the Pipeline so they learn from training rows only.' },
+      F2: { lab: 'Lab 1', title: 'A column that is only known after the customer leaves', what: 'retention_team_calls is logged when a customer phones to cancel. When the model has to decide, it is always 0.', fix: 'Drop every column you cannot know at prediction time.' },
+      F3: { lab: 'Lab 2', title: 'Unscaled baht columns and a large learning rate', what: 'Income and monthly bill stay in raw baht while the learning rate is 1.0. The notebook prints only the last mini-batch loss.', fix: 'Scale every input, lower the learning rate, plot the loss over full epochs.' },
+      F4: { lab: 'Lab 5', title: 'Accuracy is the only metric', what: 'About 4% of customers churn, so a model that predicts "nobody leaves" already scores about 96%.', fix: 'Report PR-AUC, recall and a confusion matrix next to a dummy baseline.' },
+      F5: { lab: 'Lab 5', title: 'Decision threshold left at 0.5', what: 'A customer gets a retention offer only if the predicted churn probability is at least 0.5, which rarely happens.', fix: 'Pick the threshold that minimises cost on validation data (miss ฿8,000, offer ฿500).' },
+      F6: { lab: 'Lab 4', title: 'Random split on time-ordered data', what: 'Rows from 2022 to 2025 are shuffled before splitting, so the test set comes from the same months the model trained on.', fix: 'Train on 2022 to 2024, test on 2025, the way the model will be used.' },
+      F7: { lab: 'Lab 4', title: 'Hyperparameters tuned on the test set', what: 'Nine settings were tried, the test score was printed for each, and the best one was kept.', fix: 'Tune on a validation split inside the training data. Score the test set once.' },
+      F8: { lab: 'Lab 4', title: 'The same customer on both sides of the split', what: 'Family plans put 1 to 5 phone lines of one account in the data. A row-wise split puts sibling lines in both train and test.', fix: 'Split by account_id (GroupShuffleSplit or GroupKFold).' },
+      F9: { lab: 'Lab 3 · bonus', title: 'Class weights distort the probabilities', what: "class_weight='balanced' multiplies every churner's weight, so the predicted probabilities come out far too high.", fix: 'Train without the weights, or recalibrate the probabilities before using them for cost decisions.' },
+    },
+  };
+  const GLOSS = {
+    th: [
+      ['Churn', 'ลูกค้ายกเลิกบริการหรือย้ายค่าย สิ่งที่โมเดลนี้พยายามทำนาย'],
+      ['Accuracy', 'สัดส่วนที่ทายถูกทั้งหมด หลอกตาได้ง่ายเมื่อคลาสหนึ่งมีน้อยมาก'],
+      ['PR-AUC', 'พื้นที่ใต้เส้น precision–recall 1.0 = สมบูรณ์แบบ ส่วนการสุ่มเดาจะได้เท่ากับอัตราการย้ายค่าย (~0.04)'],
+      ['Recall', 'ในลูกค้าที่ย้ายจริง โมเดลจับได้กี่เปอร์เซ็นต์'],
+      ['Precision', 'ในลูกค้าที่โมเดลบอกว่าจะย้าย ย้ายจริงกี่เปอร์เซ็นต์'],
+      ['Threshold', 'ความน่าจะเป็นขั้นต่ำที่ทำให้ส่งข้อเสนอให้ลูกค้า'],
+      ['Log loss', 'วัดว่าความน่าจะเป็นที่ทำนายใกล้ความจริงแค่ไหน ยิ่งต่ำยิ่งดี'],
+      ['Data leakage', 'ข้อมูลจาก test set หรือจากอนาคตแอบเข้าไปตอนเทรน ทำให้คะแนนดูดีเกินจริง'],
+      ['Baseline', 'โมเดลโง่ ๆ ที่ใช้เทียบ ในที่นี้คือทายว่า “ไม่มีใครย้าย” ทุกครั้ง'],
+      ['PSI / drift', 'วัดว่าการกระจายของอินพุตเปลี่ยนไปจากตอนเทรนแค่ไหน เกิน 0.2 = ควรเตือน'],
+    ],
+    en: [
+      ['Churn', 'A customer cancelling or moving to another operator. This is what the model predicts.'],
+      ['Accuracy', 'Share of all predictions that are right. Misleading when one class is rare.'],
+      ['PR-AUC', 'Area under the precision–recall curve. 1.0 is perfect; random guessing scores the churn rate (~0.04).'],
+      ['Recall', 'Of the customers who really churned, the share the model caught.'],
+      ['Precision', 'Of the customers the model flagged, the share who really churned.'],
+      ['Threshold', 'The minimum predicted probability that triggers a retention offer.'],
+      ['Log loss', 'How close the predicted probabilities are to what happened. Lower is better.'],
+      ['Data leakage', 'Information from the test set or from the future sneaking into training, so the score looks better than it is.'],
+      ['Baseline', 'A dumb model to compare against. Here: always predict "nobody leaves".'],
+      ['PSI / drift', 'How much an input’s distribution has moved since training. Above 0.2 deserves an alert.'],
+    ],
+  };
+  const FIDS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
+  const CONSULTANT = { F1: true, F2: true, F3: true, F4: true, F5: true, F6: true, F7: true, F8: true, F9: false };
+  const AUDITOR = Object.fromEntries(FIDS.map((f) => [f, false]));
+  const without = (...ids) => ({ ...CONSULTANT, ...Object.fromEntries(ids.map((i) => [i, false])) });
+
+  // Guide steps: setup = state applied when the step opens; act = "do it for me"; hl = elements to highlight
+  const STEPS = [
+    { setup: { flaws: CONSULTANT, model: 'lr', released: false, tab: 'loss' }, hl: ['board', 'pipe-panel', 'ev-panel'] },
+    { setup: { flaws: CONSULTANT, model: 'lr', released: false }, act: { flaws: without('F4') }, hl: ['cell-reported', 'card-F4'] },
+    { setup: { flaws: without('F4'), model: 'lr', tab: 'loss' }, act: { flaws: without('F4', 'F3') }, hl: ['card-F3', 'ev-panel'] },
+    { setup: { flaws: without('F4', 'F3'), model: 'lr', tab: 'feat' }, act: { flaws: without('F4', 'F3', 'F2') }, hl: ['cell-reported', 'cell-today', 'card-F2', 'ev-panel'] },
+    { setup: { flaws: without('F4', 'F3', 'F2'), model: 'lr', tab: 'cost' }, act: { flaws: without('F4', 'F3', 'F2', 'F5') }, hl: ['card-F5', 'ev-panel'] },
+    { setup: { flaws: without('F4', 'F3', 'F2', 'F5'), model: 'lr', tab: 'pr' }, act: { flaws: without('F4', 'F3', 'F2', 'F5', 'F6') }, hl: ['card-F6', 'cell-today', 'ev-panel'] },
+    { setup: { flaws: without('F4', 'F3', 'F2', 'F5', 'F6'), model: 'lr' }, act: { flaws: without('F4', 'F3', 'F2', 'F5', 'F6', 'F7', 'F1') }, hl: ['card-F7', 'card-F1', 'diagram'] },
+    { setup: { flaws: { ...AUDITOR, F6: true }, model: 'knn', tab: 'pr' }, act: { flaws: { ...AUDITOR, F6: true, F8: true } }, hl: ['model-seg', 'card-F8', 'cell-reported'] },
+    { setup: { flaws: AUDITOR, model: 'lr', tab: 'calib' }, act: { flaws: { ...AUDITOR, F9: true } }, hl: ['card-F9', 'ev-panel'] },
+    { setup: { flaws: AUDITOR, model: 'lr', released: false }, act: { released: true }, hl: ['cell-today', 'cell-next'] },
+    { setup: { flaws: AUDITOR, model: 'lr', released: true, tab: 'drift', drift: 'next' }, hl: ['ev-panel', 'cell-next'] },
+    { setup: null, hl: ['flaw-bar'] },
+  ];
+  const GT = {
+    th: [
+      { t: 'เริ่มที่นี่: หน้านี้คืออะไร',
+        do: 'อ่านสถานการณ์: ที่ปรึกษาส่งโมเดลทำนายลูกค้าย้ายค่ายมา พร้อมบอกว่าแม่นยำราว 96% คุณคือทีมตรวจสอบ (auditor) ที่ต้องหาว่าตัวเลขนี้เชื่อได้แค่ไหน',
+        look: 'หน้าจอมี 3 ส่วนตามหมายเลข: <b>① ผลคะแนน</b> เทียบ “สิ่งที่โน้ตบุ๊กรายงาน” กับ “ผลจริงตอนใช้งาน” <b>② ไปป์ไลน์</b> และสวิตช์ F1–F9 (แดง = มีข้อผิดพลาด, เขียว = แก้แล้ว) <b>③ หลักฐาน</b> แท็บกราฟที่ใช้พิสูจน์ว่าข้อผิดพลาดมีจริง',
+        why: 'คู่มือจะพาไปทีละข้อผิดพลาด แต่ละขั้นจะตั้งสวิตช์ให้พร้อมเริ่ม ให้คุณลองกดเองก่อน ถ้าติด กด “ทำให้ดู” ตัวเลขที่ซื่อสัตย์สำคัญกว่าตัวเลขที่สูง' },
+      { t: 'ขั้น 1 · accuracy 95.6% ดีจริงไหม (F4)',
+        do: 'ดูช่อง ① “สิ่งที่โน้ตบุ๊กรายงาน” แล้วเทียบกับชิป Baseline ใต้ตัวเลข จากนั้น<b>ปิดสวิตช์ F4</b> ใน ②',
+        look: 'accuracy ของโมเดลเท่ากับ baseline ที่ทายว่า “ไม่มีใครย้าย” พอดี หลังปิด F4 ตัวเลขใหญ่เปลี่ยนเป็น PR-AUC ≈ 0.044 เท่ากับการสุ่มเดา',
+        why: 'เมื่อคลาสไม่สมดุล (ย้ายค่ายแค่ ~4%) accuracy สูงได้ทั้งที่โมเดลไม่ได้ทำอะไรเลย ต้องดู PR-AUC, recall และเทียบกับ baseline เสมอ (Lab 5)' },
+      { t: 'ขั้น 2 · ทำไมโมเดลถึงพัง: loss curve (F3)',
+        do: 'ดูแท็บ ③ <b>Loss curve</b> แล้ว<b>ปิดสวิตช์ F3</b>',
+        look: 'ก่อนแก้: loss (เส้นส้ม) กระโดดไปมา ส่วนจุดเขียวที่โน้ตบุ๊กพิมพ์ดูไม่น่ากลัว หลังแก้: เส้นน้ำเงินลดลงอย่างราบรื่น',
+        why: 'อินพุตหน่วยบาทมีค่าเป็นหลักหมื่น gradient จึงใหญ่มาก learning rate สูงทำให้เลยเป้าทุกครั้ง ต้อง scale อินพุต และดู loss ทั้ง epoch ไม่ใช่แค่ batch สุดท้าย (Lab 2)' },
+      { t: 'ขั้น 3 · PR-AUC เกิน 0.9! เก่งเกินจริงไหม (F2)',
+        do: 'ดูช่อง ① อีกครั้ง คะแนนในโน้ตบุ๊กพุ่งขึ้น แต่ช่อง ม.ค. 2026 ไม่ขึ้นตาม เปิดแท็บ ③ <b>ฟีเจอร์</b> แล้ว<b>ปิดสวิตช์ F2</b>',
+        look: 'retention_team_calls (แถบแดง) ครองโมเดลเกือบทั้งหมด และในตาราง recall ของ ม.ค. 2026 เป็น 0%',
+        why: 'คอลัมน์นี้รู้ค่าได้หลังลูกค้าโทรมาขอยกเลิกแล้ว ตอนใช้งานจริงจึงเป็น 0 เสมอ นี่คือ target leakage ให้ถามทุกคอลัมน์ว่า “รู้ค่านี้ได้เมื่อไร” (Lab 1)' },
+      { t: 'ขั้น 4 · threshold 0.5 ทำให้จับใครไม่ได้ (F5)',
+        do: 'ดูแท็บ ③ <b>Threshold และต้นทุน</b> แล้ว<b>ปิดสวิตช์ F5</b> ลองเลื่อน slider ดู',
+        look: 'ที่ 0.5 ช่องแดง “หลุดไป” ใน confusion matrix ใหญ่มาก หลังแก้ threshold ลดเหลือราว 0.05 ต้นทุนต่อ 1,000 คนลดลง',
+        why: 'พลาดลูกค้า 1 คนเสีย ฿8,000 ส่งข้อเสนอเผื่อเสียแค่ ฿500 จึงคุ้มที่จะส่งเผื่อไว้ เลือก threshold จากต้นทุนธุรกิจ ไม่ใช่จาก 0.5 (Lab 5)' },
+      { t: 'ขั้น 5 · แบ่งข้อมูลให้เหมือนตอนใช้งานจริง (F6)',
+        do: 'ดูชิปใต้ช่อง ม.ค. 2026 ที่บอกว่าโน้ตบุ๊ก “รายงานเกินจริง” เท่าไร แล้ว<b>ปิดสวิตช์ F6</b>',
+        look: 'เดือนใน test เปลี่ยนจากปนกันทุกปี เป็นปี 2025 อย่างเดียว ช่องว่างระหว่างเส้นน้ำเงินกับส้มในแท็บ ③ Precision–recall แคบลง',
+        why: 'ตอนใช้งานจริง โมเดลต้องทำนายอนาคต การสุ่มแบ่งทำให้ test มาจากช่วงเวลาที่โมเดลเห็นแล้ว คะแนนจึงดีเกินจริง (Lab 4)' },
+      { t: 'ขั้น 6 · หยุดแอบดู test set (F7, F1)',
+        do: 'อ่านตัวเลขในการ์ด F7 (แอบดู test 9 ครั้ง) และ F1 แล้ว<b>ปิดทั้ง F7 และ F1</b>',
+        look: 'เส้นประสีแดงที่วิ่งจาก Test set ในแผนภาพ ② หายไป คะแนนอาจขยับไม่มาก',
+        why: 'test set คือข้อสอบที่ห้ามเห็นก่อน ถ้าใช้เลือกโมเดลหรือ fit scaler คะแนนสุดท้ายจะไม่ใช่การประเมินที่ซื่อสัตย์ แม้ตัวเลขเปลี่ยนนิดเดียว ความผิดอยู่ที่กระบวนการ (Lab 1, Lab 4)' },
+      { t: 'ขั้น 7 · ลูกค้าคนเดียวกันอยู่สองฝั่ง (F8)',
+        do: 'คู่มือเปลี่ยนเป็น <b>k-NN</b> และเปิด F6 (สุ่มแบ่ง) ไว้ให้แล้ว จดคะแนนในช่อง ① แล้ว<b>เปิดสวิตช์ F8</b> (รอราว 2 วินาที)',
+        look: 'เมื่อเปิด F8 คะแนน test ของ k-NN สูงขึ้นชัด แต่ช่อง ม.ค. 2026 ไม่ดีขึ้น',
+        why: 'k-NN “จำ” เบอร์อื่นในบัญชีเดียวกันได้ เพราะข้อมูลแทบเหมือนกัน แถวจากลูกค้าคนเดียวกันไม่เป็นอิสระต่อกัน ต้องแบ่งตาม account_id (GroupKFold) (Lab 4)' },
+      { t: 'ขั้น 8 · ความน่าจะเป็นเชื่อได้ไหม (F9, โบนัส)',
+        do: 'กลับมาใช้ Logistic regression แล้ว ดูแท็บ ③ <b>Calibration</b> แล้ว<b>เปิดสวิตช์ F9</b>',
+        look: 'จุดเลื่อนไปอยู่ใต้เส้นทแยง และ log loss สูงขึ้น ทั้งที่ PR-AUC แทบไม่เปลี่ยน',
+        why: 'ถ้าจะใช้ความน่าจะเป็นไปคำนวณต้นทุน ค่าต้องตรงความจริง ไม่ใช่แค่จัดอันดับถูก (Lab 3)' },
+      { t: 'ขั้น 9 · ทายผลเดือนหน้าก่อนเฉลย',
+        do: 'ตอนนี้ทุกข้อผิดพลาดถูกแก้แล้ว อ่านคะแนน ม.ค. 2026 แล้ว<b>พิมพ์ PR-AUC และ recall ที่คาดว่าจะได้ในเดือน ก.พ.</b> ในช่อง ① ด้านขวา จากนั้นกด “เปิดข้อมูล ก.พ.”',
+        look: 'คู่แข่งเปิดแพ็กเกจใหม่ อัตราการย้ายเพิ่มเกือบเท่าตัว recall ลดลง ชิปจะบอกว่าคุณทายคลาดไม่เกิน ±0.10 หรือมั่นใจเกินไป',
+        why: 'การประเมินที่ดีคือรู้ขีดจำกัดของโมเดล ทีมที่ทาย 0.18 แล้วได้ 0.17 ดีกว่าทีมที่ทาย 0.90 แล้วได้ 0.17' },
+      { t: 'ขั้น 10 · เฝ้าระวังหลังใช้งาน (drift)',
+        do: 'ดูแท็บ ③ <b>Drift</b> (เลือก ก.พ. 2026 ไว้แล้ว) และอ่านตาราง “กฎการเฝ้าระวัง”',
+        look: 'household_income_thb มี PSI เกิน 0.2, AUC ของ adversarial validation เกิน 0.6 และมีแพ็กเกจ 5G Unlimited ที่โมเดลไม่เคยเห็น ลองกด ม.ค. 2026 เทียบดู',
+        why: 'ข้อมูลเปลี่ยนตลอด ทีมต้องกำหนดว่าจะดูอะไร เกณฑ์เตือนเท่าไร และเมื่อไรต้องเทรนใหม่ (Lab 6)' },
+      { t: 'เล่นอิสระ: ภารกิจท้าทาย',
+        do: '<ul><li>หา threshold ที่ต้นทุน ม.ค. 2026 ต่ำที่สุด เทียบกับค่าที่ระบบเลือก</li><li>เริ่มจาก “ไปป์ไลน์ที่ตรวจแก้แล้ว” แล้วเปิดข้อผิดพลาดทีละจุด จุดไหนทำให้ช่องว่างระหว่างโน้ตบุ๊กกับ ม.ค. 2026 กว้างที่สุด</li><li>เปิด “ให้ทายก่อนเฉลย” แล้วแข่งกับเพื่อนว่าใครทายทิศทางคะแนนถูกมากกว่า</li><li>เปลี่ยน Dataset seed ด้านล่างสุด เรื่องราวยังเหมือนเดิมไหม</li></ul>',
+        look: 'ไม่มีคำตอบเดียว ใช้กราฟในแท็บ ③ เป็นหลักฐานอธิบายสิ่งที่เห็น',
+        why: 'ทักษะเดียวกันนี้คือสิ่งที่ต้องใช้ตอนตรวจโน้ตบุ๊กจริงใน assignment' },
+    ],
+    en: [
+      { t: 'Start here: what this page is',
+        do: 'Read the scenario: a consultant delivered a churn model and claims about 96% accuracy. You are the audit team, and your job is to find out how far that number can be trusted.',
+        look: 'The screen has three numbered zones. <b>① Scores</b> compares what the notebook reports with real deployment. <b>② Pipeline</b> holds the F1–F9 switches (red = flaw present, green = fixed). <b>③ Evidence</b> has the charts that prove each flaw is real.',
+        why: 'The guide takes one flaw per step and sets the switches up for you at the start of each step. Try the action yourself first; press "Do it for me" if you get stuck. An honest number matters more than a high one.' },
+      { t: 'Step 1 · Is 95.6% accuracy good? (F4)',
+        do: 'Look at ① "What the notebook reports" and compare it with the Baseline chip under it. Then <b>switch F4 off</b> in ②.',
+        look: 'The accuracy equals the baseline that predicts "nobody leaves". With F4 off, the big number becomes PR-AUC ≈ 0.044, the same as guessing.',
+        why: 'With imbalanced classes (about 4% churn), accuracy can be high while the model does nothing. Always check PR-AUC, recall and a baseline (Lab 5).' },
+      { t: 'Step 2 · Why is the model broken? Loss curve (F3)',
+        do: 'Look at the ③ <b>Loss curve</b> tab, then <b>switch F3 off</b>.',
+        look: 'Before the fix the loss (orange) jumps around, while the green dots the notebook printed look harmless. After the fix the blue line falls smoothly.',
+        why: 'Baht inputs are in the tens of thousands, so the gradients are huge and a high learning rate overshoots every step. Scale the inputs and watch the full-epoch loss, not just the last batch (Lab 2).' },
+      { t: 'Step 3 · PR-AUC above 0.9! Too good to be true? (F2)',
+        do: 'Look at ① again: the notebook score jumped, but January 2026 did not follow. Open the ③ <b>Features</b> tab, then <b>switch F2 off</b>.',
+        look: 'retention_team_calls (red bar) dominates the model, and in the table January 2026 recall is 0%.',
+        why: 'That column only exists after a customer phones to cancel, so at prediction time it is always 0. This is target leakage: ask of every column "when do we know this?" (Lab 1).' },
+      { t: 'Step 4 · Threshold 0.5 catches nobody (F5)',
+        do: 'Open ③ <b>Threshold & cost</b>, then <b>switch F5 off</b> and try the slider.',
+        look: 'At 0.5 the red "missed" cell of the confusion matrix is huge. After the fix the threshold drops to about 0.05 and the cost per 1,000 customers falls.',
+        why: 'A missed churner costs ฿8,000 and a spare offer only ฿500, so it pays to send offers generously. Pick the threshold from business costs, not 0.5 (Lab 5).' },
+      { t: 'Step 5 · Split the data the way it will be used (F6)',
+        do: 'Read the chip under January 2026 that says how much the notebook overstates. Then <b>switch F6 off</b>.',
+        look: 'The test months change from a mix of all years to 2025 only, and the gap between the blue and orange curves in ③ Precision–recall narrows.',
+        why: 'In deployment the model predicts the future. A random split tests it on months it already saw, so the score is too optimistic (Lab 4).' },
+      { t: 'Step 6 · Stop peeking at the test set (F7, F1)',
+        do: 'Read the numbers on the F7 card (9 test-set peeks) and the F1 card, then <b>switch both F7 and F1 off</b>.',
+        look: 'The red dashed arrows leaving the Test set in diagram ② disappear. The score may barely move.',
+        why: 'The test set is an exam you must not see in advance. Using it to pick a model or fit a scaler means the final score is no longer an honest estimate, even when the number hardly changes. The fault is in the process (Lab 1, Lab 4).' },
+      { t: 'Step 7 · The same customer on both sides (F8)',
+        do: 'The guide has switched to <b>k-NN</b> with F6 (random split) on. Note the score in ①, then <b>switch F8 on</b> (wait about 2 seconds).',
+        look: "With F8 on, k-NN's test score rises clearly, but January 2026 does not improve.",
+        why: 'k-NN "remembers" the other lines of the same account because their data is almost identical. Rows from one customer are not independent: split by account_id (GroupKFold) (Lab 4).' },
+      { t: 'Step 8 · Can you trust the probabilities? (F9, bonus)',
+        do: 'Back on logistic regression. Open ③ <b>Calibration</b>, then <b>switch F9 on</b>.',
+        look: 'The dots move below the diagonal and log loss rises, while PR-AUC barely changes.',
+        why: 'If probabilities feed a cost calculation they must match reality, not just rank customers correctly (Lab 3).' },
+      { t: 'Step 9 · Predict next month before the reveal',
+        do: 'Every flaw is now fixed. Read the January 2026 score, then <b>type the PR-AUC and recall you expect for February</b> in the right-hand box of ①, and press "Release Feb data".',
+        look: 'A rival launches a new plan, the churn rate almost doubles and recall falls. The chip tells you whether you were within ±0.10 or overconfident.',
+        why: 'Good evaluation means knowing the model’s limits. A team that predicts 0.18 and gets 0.17 beats one that predicts 0.90 and gets 0.17.' },
+      { t: 'Step 10 · Monitoring after deployment (drift)',
+        do: 'Look at ③ <b>Drift</b> (Feb 2026 is selected) and read the monitoring rules.',
+        look: 'household_income_thb has PSI above 0.2, the adversarial validation AUC is above 0.6, and there is a 5G Unlimited plan the model has never seen. Press Jan 2026 to compare.',
+        why: 'Data keeps changing. A team must decide what to watch, the alert threshold, and when to retrain (Lab 6).' },
+      { t: 'Free play: challenges',
+        do: '<ul><li>Find the threshold with the lowest January 2026 cost and compare it with the one the pipeline picked.</li><li>Start from "Audited pipeline" and switch flaws on one at a time. Which one opens the biggest gap between the notebook and January 2026?</li><li>Turn on "Predict before reveal" and compete with a friend on who calls the direction right more often.</li><li>Change the Dataset seed at the bottom. Does the story hold?</li></ul>',
+        look: 'There is no single answer. Use the charts in ③ as evidence for what you see.',
+        why: 'These are the same skills you need when you audit a real notebook in the assignment.' },
+    ],
+  };
+
+  let lang = 'th';
+  try { const l = localStorage.getItem('bpl-lang'); if (l === 'en' || l === 'th') lang = l; } catch (e) {}
+  const t = (k, ...a) => { const v = I[lang][k] !== undefined ? I[lang][k] : I.en[k]; return typeof v === 'function' ? v(...a) : v; };
+  const ml = (m) => lang === 'th' ? THM[m % 12] + ' ' + (2022 + Math.floor(m / 12)) : E.monthLabel(m);
+
+  // ================= state =================
+  const state = {
+    flaws: { ...CONSULTANT }, model: 'lr', threshold: null, predictFirst: false,
+    released: false, tab: 'loss', seed: 11, ask: null, verdicts: {}, driftWhich: 'recent',
+    guideOpen: true, step: 0,
+  };
+  try { const g = localStorage.getItem('bpl-guide'); if (g) { const o = JSON.parse(g); state.guideOpen = !!o.open; state.step = Math.min(STEPS.length - 1, Math.max(0, o.step | 0)); } } catch (e) {}
+  let R = null;
+  const cache = new Map();
+  const driftCache = new Map();
+  const $ = (id) => document.getElementById(id);
+
+  // ================= worker =================
+  let worker = null, reqId = 0;
+  const pending = new Map();
+  let localWorld = null;
+  try {
+    const src = $('engine-src').textContent + `
+      let world = null;
+      onmessage = (e) => {
+        const m = e.data;
+        try {
+          if (m.type === 'build') { world = Engine.build(m.seed); postMessage({ id: m.id, ok: true }); }
+          else if (m.type === 'run') postMessage({ id: m.id, ok: true, result: Engine.run(world, m.cfg) });
+          else if (m.type === 'drift') postMessage({ id: m.id, ok: true, result: Engine.drift(world, m.which) });
+        } catch (err) { postMessage({ id: m.id, ok: false, error: String(err) }); }
+      };`;
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    worker.onmessage = (e) => { const p = pending.get(e.data.id); if (!p) return; pending.delete(e.data.id); e.data.ok ? p.res(e.data.result) : p.rej(e.data.error); };
+    worker.onerror = () => { worker = null; };
+  } catch (err) { worker = null; }
+  function call(msg) {
+    if (worker) return new Promise((res, rej) => { const id = ++reqId; pending.set(id, { res, rej }); worker.postMessage({ ...msg, id }); });
+    return new Promise((res) => setTimeout(() => {
+      if (msg.type === 'build') { localWorld = E.build(msg.seed); res(true); }
+      else if (msg.type === 'run') res(E.run(localWorld, msg.cfg));
+      else res(E.drift(localWorld, msg.which));
+    }, 20));
+  }
+
+  // ================= formatting =================
+  const f3 = (v) => v.toFixed(3);
+  const pct = (v) => (v * 100).toFixed(1) + '%';
+  const baht = (v) => '฿' + Math.round(v).toLocaleString('en-US');
+  const int = (v) => Math.round(v).toLocaleString('en-US');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const L = (th, en) => (lang === 'th' ? th : en);
+
+  // ================= metrics =================
+  function threshold() { return state.flaws.F5 ? 0.5 : (state.threshold != null ? state.threshold : R.costTh); }
+  function M() {
+    const th = threshold(), s = R.scores;
+    return {
+      th,
+      rep: E.metrics(s.yTest, s.test, th), repB: E.baseline(s.yTest),
+      today: E.metrics(s.yToday, s.today, th), todayB: E.baseline(s.yToday),
+      next: E.metrics(s.yNext, s.next, th), nextB: E.baseline(s.yNext),
+    };
+  }
+
+  // ================= running =================
+  let runToken = 0;
+  async function rerun() {
+    const key = JSON.stringify({ f: state.flaws, m: state.model, s: state.seed });
+    $('busy').hidden = false;
+    const tok = ++runToken;
+    let res = cache.get(key);
+    if (!res) { res = await call({ type: 'run', cfg: { flaws: state.flaws, model: state.model } }); cache.set(key, res); }
+    if (tok !== runToken) return;
+    const prev = R; R = res;
+    $('busy').hidden = true;
+    if (state.ask && state.ask.answered && prev) settleVerdict(prev);
+    render();
+  }
+  function settleVerdict(prev) {
+    const a = state.ask; state.ask = null;
+    const before = prev._rep, now = M().rep;
+    const useAcc = state.flaws.F4 && prev._F4;
+    const b = useAcc ? before.accuracy : before.prauc, n = useAcc ? now.accuracy : now.prauc;
+    const d = n - b, eps = useAcc ? 0.002 : 0.01;
+    const actual = d > eps ? 'up' : d < -eps ? 'down' : 'same';
+    state.verdicts[a.id] = { ok: a.guess === actual, g: a.guess, b: useAcc ? pct(b) : f3(b), n: useAcc ? pct(n) : f3(n), k: useAcc ? 'accuracy' : 'PR-AUC' };
+  }
+
+  // ================= static text =================
+  function applyStatic() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i]').forEach((el) => { el.innerHTML = t(el.dataset.i); });
+    $('lang-th').setAttribute('aria-pressed', lang === 'th'); $('lang-en').setAttribute('aria-pressed', lang === 'en');
+  }
+
+  // ================= scoreboard =================
+  function gapChip(rep, real) {
+    const d = rep - real;
+    if (d > 0.1) return `<span class="chip bad">${t('over', f3(d))}</span>`;
+    if (d > 0.03) return `<span class="chip warn">${t('over', f3(d))}</span>`;
+    if (d < -0.03) return `<span class="chip neutral">${t('under', f3(-d))}</span>`;
+    return `<span class="chip good">${t('within', f3(Math.abs(d)))}</span>`;
+  }
+  function renderBoard(m) {
+    const F = state.flaws, tm = R.split.testMonths;
+    const accLine = (x) => pct(x.accuracy) + `<span class="unit">${t('accUnit')}</span>`;
+    $('rep-acc').innerHTML = F.F4 ? '' : accLine(m.rep); $('rep-acc').hidden = F.F4;
+    $('today-acc').innerHTML = accLine(m.today);
+    $('next-acc').innerHTML = accLine(m.next);
+    if (F.F4) {
+      $('rep-big').innerHTML = (m.rep.accuracy * 100).toFixed(1) + `<span class="unit">${t('accBig')}</span>`;
+      $('rep-sub').textContent = t('repSubF4', ml(tm[0]), ml(tm[1]));
+      const d = m.rep.accuracy - m.repB.accuracy;
+      $('rep-chip').innerHTML = `<span class="chip ${Math.abs(d) < 0.01 ? 'bad' : 'neutral'}">${t('baseChipAcc', pct(m.repB.accuracy))}</span>`;
+    } else {
+      $('rep-big').innerHTML = f3(m.rep.prauc) + '<span class="unit">PR-AUC</span>';
+      $('rep-sub').textContent = t('repSub', ml(tm[0]), ml(tm[1]), pct(m.rep.recall), m.th.toFixed(2));
+      $('rep-chip').innerHTML = `<span class="chip neutral">${t('baseChipPr', f3(m.repB.prauc))}</span>`;
+    }
+    $('today-big').innerHTML = f3(m.today.prauc) + '<span class="unit">PR-AUC</span>';
+    $('today-sub').textContent = t('todaySub', int(m.today.n), pct(m.today.recall), baht(m.today.costPer1000));
+    $('today-chip').innerHTML = F.F4
+      ? (m.today.recall < 0.05 ? `<span class="chip bad">${t('noCatch')}</span>` : '')
+      : gapChip(m.rep.prauc, m.today.prauc);
+    $('next-locked').hidden = state.released; $('next-open').hidden = !state.released;
+    if (state.released) {
+      $('next-big').innerHTML = f3(m.next.prauc) + '<span class="unit">PR-AUC</span>';
+      $('next-sub').textContent = t('nextSub', pct(m.next.rate), pct(m.today.rate), pct(m.next.recall), baht(m.next.costPer1000));
+      const p = parseFloat($('pred-prauc').value);
+      let chip = '';
+      if (!isNaN(p)) {
+        const err = p - m.next.prauc;
+        chip = Math.abs(err) <= 0.1 ? `<span class="chip good">${t('predOk', f3(p))}</span>`
+          : `<span class="chip ${err > 0 ? 'bad' : 'warn'}">${err > 0 ? t('predOver', f3(p), f3(Math.abs(err))) : t('predUnder', f3(p), f3(Math.abs(err)))}</span>`;
+      }
+      const pr = parseFloat($('pred-recall').value);
+      if (!isNaN(pr)) {
+        const e2 = pr / 100 - m.next.recall;
+        chip += ` <span class="chip ${Math.abs(e2) <= 0.1 ? 'good' : e2 > 0 ? 'bad' : 'warn'}">${Math.abs(e2) <= 0.1 ? t('recOk', pr) : t('recOff', pr, Math.round(Math.abs(e2) * 100))}</span>`;
+      }
+      $('next-chip').innerHTML = chip || `<span class="chip neutral">${t('noPred')}</span>`;
+    }
+    const names = t('rows');
+    const fns = [
+      (x) => pct(x.accuracy), (x) => f3(x.prauc), (x) => pct(x.recall), (x) => pct(x.precision), (x) => f3(x.logloss),
+      (x) => x.per1000 ? int(x.per1000.caught) : '0', (x) => x.per1000 ? int(x.per1000.missed) : int(x.rate * 1000),
+      (x) => x.per1000 ? int(x.per1000.wasted) : '0', (x) => baht(x.costPer1000),
+    ];
+    const baseRow = { ...m.repB, per1000: null };
+    $('cmp').querySelector('tbody').innerHTML = fns.map((fn, i) =>
+      `<tr><td>${names[i]}</td>${F.F4 && i > 0 ? `<td class="hidden-metric">${t('notReported')}</td>` : `<td>${fn(m.rep)}</td>`}<td>${fn(m.today)}</td><td>${state.released ? fn(m.next) : `<span class="hint">${t('locked')}</span>`}</td><td>${i === 3 ? '–' : fn(baseRow)}</td></tr>`).join('');
+  }
+
+  // ================= pipeline diagram =================
+  function renderDiagram(m) {
+    const F = state.flaws, red = 'var(--flaw)', green = 'var(--fixed)', ink = 'var(--ink)', ink2 = 'var(--ink-2)';
+    const W = 108, H = 70, Y = 78, xs = [8, 132, 256, 380, 504, 628, 752, 876];
+    const knn = state.model === 'knn';
+    const nodes = [
+      { t: L('ข้อมูลดิบ', 'Raw data'), s: [knn ? L('5,600 บัญชี', '5,600 accounts') : L('20,000 บัญชี', '20,000 accounts'), L('2022 ถึง 2025', '2022 to 2025')] },
+      { t: L('คอลัมน์', 'Columns'), s: F.F2 ? [L('42 อินพุต', '42 inputs'), L('รวมคอลัมน์รั่ว', 'incl. leak')] : [L('41 อินพุต', '41 inputs'), L('ตัดคอลัมน์รั่ว', 'leak dropped')], bad: F.F2, f: F.F2 ? 'F2' : '' },
+      { t: L('แบ่งข้อมูล', 'Split'), s: F.F6 ? (F.F8 ? [L('สุ่มรายแถว', 'random rows'), int(R.split.sharedAccounts) + L(' บัญชีซ้ำ', ' shared accts')] : [L('สุ่ม', 'random'), L('ตามบัญชี', 'by account')]) : [L('ตามเวลา', 'by time'), 'train ≤2024 · test 2025'], bad: F.F6 || F.F8, f: [F.F6 && 'F6', F.F8 && F.F6 && 'F8'].filter(Boolean).join(' ') },
+      { t: 'Scale + select', s: [F.F1 ? L('fit กับทุกแถว', 'fitted on all rows') : L('fit กับ train', 'fitted on train'), F.F3 ? L('เงินบาทไม่ scale', 'baht left raw') : L('scale ครบ', 'all inputs scaled')], bad: F.F1 || F.F3, f: [F.F1 && 'F1', F.F3 && 'F3'].filter(Boolean).join(' ') },
+      { t: knn ? 'k-NN' : 'Logistic reg.', s: [knn ? 'k = ' + R.chosen.k : 'lr ' + (F.F3 ? '1.0' : '0.2') + ', 20 epochs', F.F9 ? L('ลูกค้าย้าย ×', 'churners ×') + Math.round(R.classWeight) : L('ไม่ถ่วงน้ำหนัก', 'unweighted')], bad: F.F3 || F.F9, f: [F.F3 && 'F3', F.F9 && 'F9'].filter(Boolean).join(' ') },
+      { t: L('จูน', 'Tune'), s: F.F7 ? [L('เลือกจาก test', 'picked on test'), R.gridSize + L(' ครั้งที่แอบดู', ' peeks')] : [L('เลือกจาก', 'picked on'), 'validation'], bad: F.F7, f: F.F7 ? 'F7' : '' },
+      { t: 'Threshold', s: [m.th.toFixed(2), F.F5 ? L('ค่าเริ่มต้น', 'default') : L('จากต้นทุน', 'from cost')], bad: F.F5, f: F.F5 ? 'F5' : '' },
+      { t: L('รายงาน', 'Report'), s: F.F4 ? ['accuracy', L('อย่างเดียว', 'only')] : ['PR-AUC, recall,', L('ต้นทุน vs baseline', 'cost vs baseline')], bad: F.F4, f: F.F4 ? 'F4' : '' },
+    ];
+    let svg = `<svg viewBox="0 0 992 272" role="img" aria-label="Pipeline"><defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker>
+      <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${red}"/></marker></defs>`;
+    for (let i = 0; i < 7; i++) svg += `<line x1="${xs[i] + W}" y1="${Y + H / 2}" x2="${xs[i + 1] - 3}" y2="${Y + H / 2}" stroke="var(--ink-3)" stroke-width="1.5" marker-end="url(#ah)"/>`;
+    const tx = 256, ty = 196;
+    svg += `<path d="M${tx + W / 2},${Y + H} L${tx + W / 2},${ty - 3}" stroke="var(--ink-3)" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>`;
+    svg += `<rect x="${tx}" y="${ty}" width="${W}" height="56" rx="8" fill="var(--surface-2)" stroke="var(--rule-strong)"/>`;
+    svg += `<text x="${tx + 10}" y="${ty + 22}" font-size="13" font-weight="600" fill="${ink}">Test set</text><text x="${tx + 10}" y="${ty + 41}" font-size="11.5" fill="${ink2}">${int(R.split.test)} ${L('เบอร์', 'lines')}</text>`;
+    svg += `<path d="M${tx + W},${ty + 28} L${xs[7] + W / 2},${ty + 28} L${xs[7] + W / 2},${Y + H + 3}" stroke="var(--ink-3)" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>`;
+    svg += `<text x="${(tx + W + xs[7]) / 2 + 40}" y="${ty + 22}" font-size="11" fill="var(--ink-3)" text-anchor="middle">${F.F7 ? L('ให้คะแนน ' + R.gridSize + ' ครั้ง', 'scored ' + R.gridSize + ' times') : L('ให้คะแนนครั้งเดียว', 'scored once')}</text>`;
+    if (F.F1) svg += `<path d="M${tx + W - 14},${ty} C${tx + W + 10},${ty - 34} ${xs[3] + 20},${Y + H + 30} ${xs[3] + 30},${Y + H + 3}" stroke="${red}" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#ahr)"/><text x="${xs[3] + 40}" y="${Y + H + 24}" font-size="11" fill="${red}">F1 ${L('แถว test', 'test rows')}</text>`;
+    if (F.F7) svg += `<path d="M${tx + W},${ty + 10} C${xs[5] - 40},${ty + 6} ${xs[5] + 40},${Y + H + 50} ${xs[5] + 54},${Y + H + 3}" stroke="${red}" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#ahr)"/><text x="${xs[5] + 62}" y="${Y + H + 24}" font-size="11" fill="${red}">F7 ${L('คะแนน test', 'test scores')}</text>`;
+    const lx = xs[1];
+    if (F.F2) svg += `<rect x="${lx - 4}" y="6" width="182" height="26" rx="13" fill="var(--flaw-soft)" stroke="${red}"/><text x="${lx + 8}" y="23" font-size="11.5" fill="${red}">F2 retention_team_calls</text><path d="M${lx + 40},32 L${lx + 40},${Y - 3}" stroke="${red}" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ahr)"/><text x="${lx + 48}" y="52" font-size="10.5" fill="${red}">${L('บันทึกหลังย้ายค่าย', 'logged after churn')}</text>`;
+    else svg += `<rect x="${lx - 4}" y="6" width="182" height="26" rx="13" fill="none" stroke="var(--rule-strong)" stroke-dasharray="3 3"/><text x="${lx + 8}" y="23" font-size="11.5" fill="var(--ink-3)" text-decoration="line-through">retention_team_calls</text>`;
+    nodes.forEach((n, i) => {
+      const x = xs[i];
+      svg += `<rect x="${x}" y="${Y}" width="${W}" height="${H}" rx="8" fill="${n.bad ? 'var(--flaw-soft)' : 'var(--surface)'}" stroke="${n.bad ? red : 'var(--rule-strong)'}" stroke-width="${n.bad ? 1.6 : 1}"/>`;
+      svg += `<text x="${x + 9}" y="${Y + 21}" font-size="13" font-weight="600" fill="${ink}">${esc(n.t)}</text>`;
+      svg += `<text x="${x + 9}" y="${Y + 40}" font-size="11" fill="${n.bad ? red : ink2}">${esc(n.s[0])}</text><text x="${x + 9}" y="${Y + 56}" font-size="11" fill="${n.bad ? red : ink2}">${esc(n.s[1])}</text>`;
+      if (n.f) svg += `<text x="${x + W - 6}" y="${Y - 6}" font-size="11" font-family="IBM Plex Mono, monospace" font-weight="600" text-anchor="end" fill="${red}">${n.f}</text>`;
+      else if (i > 0) svg += `<circle cx="${x + W - 10}" cy="${Y - 9}" r="4" fill="${green}"/>`;
+    });
+    $('diagram').innerHTML = svg + '</svg>';
+  }
+
+  // ================= flaw cards =================
+  function buildFlaws() {
+    $('flaws').innerHTML = FIDS.map((id) => `
+      <article class="flaw" id="card-${id}">
+        <div class="row1">
+          <div style="display:grid;gap:3px;min-width:0">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="code">${id}</span><span class="tag" id="lab-${id}"></span><span class="state-word" id="sw-${id}"></span></div>
+            <h3 id="ti-${id}"></h3>
+          </div>
+          <label class="switch"><input type="checkbox" id="t-${id}"><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <p class="what" id="wh-${id}"></p>
+        <div class="readout" id="ro-${id}"></div>
+        <p class="note" id="nt-${id}" hidden></p>
+        <div id="ask-${id}"></div>
+        <p class="fix" id="fx-${id}"></p>
+      </article>`).join('');
+    FIDS.forEach((id) => $('t-' + id).addEventListener('change', (e) => onToggle(id, e.target.checked)));
+  }
+  function flawText() {
+    FIDS.forEach((id) => {
+      const f = FT[lang][id];
+      $('lab-' + id).textContent = f.lab; $('ti-' + id).textContent = f.title; $('wh-' + id).textContent = f.what;
+      $('fx-' + id).innerHTML = `<b>${t('fix')}</b> ${esc(f.fix)}`;
+      $('t-' + id).setAttribute('aria-label', id + ': ' + f.title);
+    });
+  }
+  function onToggle(id, val) {
+    if (state.predictFirst && R) {
+      $('t-' + id).checked = !val;
+      state.ask = { id, val, answered: false };
+      state.verdicts[id] = null;
+      renderAsk();
+      return;
+    }
+    state.flaws[id] = val; state.verdicts[id] = null; syncPresets(); rerun();
+  }
+  function renderAsk() {
+    FIDS.forEach((id) => {
+      const el = $('ask-' + id); el.innerHTML = ''; const v = state.verdicts[id];
+      if (v) el.innerHTML = `<div class="verdict"><b style="color:${v.ok ? 'var(--fixed)' : 'var(--flaw)'}">${v.ok ? t('right') : t('wrong')}</b> ${esc(t('verdict', t('words')[v.g], v.b, v.n, v.k))}</div>`;
+    });
+    const a = state.ask; if (!a || a.answered) return;
+    const el = $('ask-' + a.id);
+    el.innerHTML = `<div class="ask"><span>${t('ask', a.val)}</span>
+      <div class="opts"><button data-g="up">${t('up')}</button><button data-g="down">${t('down')}</button><button data-g="same">${t('same')}</button><button data-g="cancel" style="border-color:var(--rule-strong);color:var(--ink-2)">${t('cancel')}</button></div></div>`;
+    el.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.g === 'cancel') { state.ask = null; renderAsk(); return; }
+      a.guess = b.dataset.g; a.answered = true;
+      R._rep = M().rep; R._F4 = state.flaws.F4;
+      state.flaws[a.id] = a.val; $('t-' + a.id).checked = a.val; syncPresets(); rerun();
+    }));
+  }
+  function renderFlawCards(m) {
+    const F = state.flaws, knn = state.model === 'knn', lrLoss = R.loss;
+    const ro = {
+      F1: L('แถว test ที่ scaler เห็น: ', 'Test rows the scaler saw: ') + int(R.split.scalerSawTest),
+      F2: (() => { const imp = R.importance.find((o) => o.f === 'retention_team_calls'); return F.F2 ? L('สัดส่วนของคอลัมน์รั่วในโมเดล: ', "Leak column's share of the model: ") + (imp ? pct(imp.v) : L('ไม่ถูกเลือก', 'not selected')) : L('ตัดคอลัมน์รั่วแล้ว', 'Leak column dropped'); })(),
+      F3: knn ? (F.F3 ? L('เงินบาทดิบครอบงำระยะทางของ k-NN', 'Raw baht dominates the k-NN distance') : L('ทุกอินพุตอยู่สเกลเดียวกัน', 'All inputs on the same scale'))
+        : (lrLoss ? (F.F3 ? L(`loss epoch สุดท้าย ${lrLoss.epoch[lrLoss.epoch.length - 1].toFixed(2)} · batch สุดท้ายที่พิมพ์ ${lrLoss.batch[lrLoss.batch.length - 1].toFixed(2)}`, `Final epoch loss ${lrLoss.epoch[lrLoss.epoch.length - 1].toFixed(2)} · last printed batch ${lrLoss.batch[lrLoss.batch.length - 1].toFixed(2)}`)
+          : L(`loss epoch สุดท้าย ${lrLoss.epoch[lrLoss.epoch.length - 1].toFixed(3)} · ลู่เข้าแล้ว`, `Final epoch loss ${lrLoss.epoch[lrLoss.epoch.length - 1].toFixed(3)} · converged`)) : ''),
+      F4: L(`Accuracy ${pct(m.rep.accuracy)} เทียบ baseline ${pct(m.repB.accuracy)}`, `Accuracy ${pct(m.rep.accuracy)} vs. baseline ${pct(m.repB.accuracy)}`),
+      F5: `Threshold ${m.th.toFixed(2)} · recall ${pct(m.rep.recall)}`,
+      F6: L(`เดือนใน test: ${ml(R.split.testMonths[0])} ถึง ${ml(R.split.testMonths[1])}${F.F6 ? ' (ปนกับเดือนที่ใช้เทรน)' : ''}`, `Test months: ${ml(R.split.testMonths[0])} to ${ml(R.split.testMonths[1])}${F.F6 ? ' (mixed with training months)' : ''}`),
+      F7: (() => { const sc = R.gridList.map((g) => g.score).sort((a, b) => a - b); return F.F7 ? L(`แอบดู test: ${R.gridSize} ครั้ง · ดีสุด ${f3(sc[sc.length - 1])}, แย่สุด ${f3(sc[0])}`, `Test-set peeks: ${R.gridSize} · best ${f3(sc[sc.length - 1])}, worst ${f3(sc[0])}`) : L('แอบดู test: 1 ครั้ง', 'Test-set peeks: 1'); })(),
+      F8: L('บัญชีที่อยู่ทั้งสองฝั่ง: ', 'Accounts on both sides: ') + int(R.split.sharedAccounts),
+      F9: L(`น้ำหนักลูกค้าที่ย้าย ×${R.classWeight.toFixed(0)} · log loss ${f3(m.rep.logloss)}`, `Churner weight ×${R.classWeight.toFixed(0)} · log loss ${f3(m.rep.logloss)}`),
+    };
+    const notes = {
+      F1: L('ในข้อมูลชุดนี้คะแนนแทบไม่เปลี่ยน แต่นี่คือบั๊กของกระบวนการ: test set ไม่ใช่ข้อมูลที่โมเดลไม่เคยเห็นอีกต่อไป จึงเชื่อถือไม่ได้', 'In this data the score barely moves. The bug is in the process: the test set is no longer unseen, so you can no longer trust it.'),
+      F3: knn ? L('k-NN ไม่มี learning rate แต่คอลัมน์เงินที่ไม่ได้ scale ยังกลบอินพุตอื่นทั้งหมดในการคำนวณระยะทาง', 'k-NN has no learning rate, but unscaled money columns still swamp every other input in the distance.') : '',
+      F7: L('การจูนบน test set ทำให้คะแนนเฟ้อมากขึ้น เมื่อ test set เล็ก หรือลองหลายค่ามาก', 'Tuning on the test set inflates the score most when the test set is small or many settings are tried.'),
+      F8: !F.F6 ? L('มีผลเฉพาะตอนแบ่งแบบสุ่ม (F6) การแบ่งตามเวลาทำให้ทุกเบอร์ในบัญชีเดียวกันอยู่ฝั่งเดียวอยู่แล้ว เพราะมีวันที่เดียวกัน', 'Only matters with a random split (F6). A time split already keeps each account on one side here, because all lines of an account share one date.')
+        : (!knn ? L('Logistic regression จำลูกค้ารายคนไม่ได้ ผลจึงน้อย ลองเปลี่ยนเป็น k-NN', 'Logistic regression cannot memorise customers, so the effect is small. Switch to k-NN to see it.') : ''),
+      F9: L('อันดับแทบไม่เปลี่ยน PR-AUC จึงใกล้เดิม แต่ความน่าจะเป็นผิด ทำให้การคำนวณต้นทุนที่ใช้ค่านี้ผิดไปด้วย', 'Ranking barely changes, so PR-AUC stays similar. The probabilities are wrong, which breaks any cost calculation that uses them.'),
+    };
+    FIDS.forEach((id) => {
+      const on = F[id];
+      $('card-' + id).classList.toggle('on', on);
+      $('t-' + id).checked = on;
+      $('sw-' + id).textContent = on ? t('present') : t('fixed');
+      $('ro-' + id).textContent = ro[id];
+      const nt = $('nt-' + id); nt.textContent = notes[id] || ''; nt.hidden = !notes[id];
+    });
+    renderAsk();
+  }
+  function syncPresets() {
+    const same = (a) => FIDS.every((f) => state.flaws[f] === a[f]);
+    $('preset-consultant').setAttribute('aria-pressed', same(CONSULTANT));
+    $('preset-auditor').setAttribute('aria-pressed', same(AUDITOR));
+    const on = FIDS.filter((f) => state.flaws[f]).length;
+    $('flaw-count').innerHTML = t('count', on, FIDS.length);
+    $('all-on').disabled = on === FIDS.length; $('all-off').disabled = on === 0;
+    $('model-lr').setAttribute('aria-pressed', state.model === 'lr'); $('model-knn').setAttribute('aria-pressed', state.model === 'knn');
+  }
+
+  // ================= charts =================
+  function axes(x0, x1, y0, y1, w, h, pad, xt, yt, xfmt, yfmt) {
+    const sx = (v) => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r);
+    const sy = (v) => h - pad.b - (v - y0) / (y1 - y0) * (h - pad.t - pad.b);
+    let g = '';
+    yt.forEach((v) => { g += `<line x1="${pad.l}" x2="${w - pad.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--grid)"/><text x="${pad.l - 6}" y="${sy(v) + 4}" text-anchor="end">${yfmt(v)}</text>`; });
+    xt.forEach((v) => { g += `<text x="${sx(v)}" y="${h - pad.b + 16}" text-anchor="middle">${xfmt(v)}</text>`; });
+    g += `<line x1="${pad.l}" x2="${w - pad.r}" y1="${h - pad.b}" y2="${h - pad.b}" stroke="var(--rule-strong)"/>`;
+    return { sx, sy, g };
+  }
+  const path = (pts, sx, sy) => pts.map((p, i) => (i ? 'L' : 'M') + sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join('');
+  function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+  function ticks(max, n = 4) { return Array.from({ length: n + 1 }, (_, i) => +(i * max / n).toFixed(6)); }
+  function hoverLine(container, w, pad, sx, series, xfmt, fmtRow) {
+    const svg = container.querySelector('svg'), tip = container.querySelector('.tip'), cross = svg.querySelector('.cross');
+    const x0 = series[0].pts[0][0], x1 = series[0].pts[series[0].pts.length - 1][0];
+    function move(ev) {
+      const rect = svg.getBoundingClientRect();
+      const vx = (ev.clientX - rect.left) / rect.width * w;
+      const xv = x0 + (vx - pad.l) / (w - pad.l - pad.r) * (x1 - x0);
+      if (xv < x0 || xv > x1) { leave(); return; }
+      const near = series.map((s) => { let best = s.pts[0]; for (const p of s.pts) if (Math.abs(p[0] - xv) < Math.abs(best[0] - xv)) best = p; return { s, p: best }; });
+      const cx = sx(near[0].p[0]);
+      cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.display = '';
+      tip.hidden = false; tip.innerHTML = `${xfmt(near[0].p[0])}<br>` + near.map((o) => `<span style="color:${o.s.color}">■</span> ${o.s.name}: ${fmtRow(o.p[1])}`).join('<br>');
+      tip.style.left = (cx / w * rect.width) + 'px'; tip.style.top = '24px';
+    }
+    function leave() { tip.hidden = true; cross.style.display = 'none'; }
+    svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', leave);
+  }
+
+  function chartLoss() {
+    if (state.model === 'knn') return `<p class="explain">${L('k-NN ไม่มีลูปการเทรน จึงไม่มี loss curve เปลี่ยนเป็น <b>logistic regression</b> เพื่อดู F3', 'k-NN has no training loop, so there is no loss curve. Switch to <b>logistic regression</b> to see F3.')}</p>`;
+    const Ls = R.loss, bpe = Ls.batchesPerEpoch, F3 = state.flaws.F3;
+    const epoch = Ls.epoch.map((v, i) => [i + 1, v]);
+    const printed = Ls.epoch.map((_, i) => [i + 1, Ls.batch[Math.min(Ls.batch.length - 1, (i + 1) * bpe - 1)]]);
+    const step = Math.max(1, Math.floor(Ls.batch.length / 400));
+    const batches = []; for (let i = 0; i < Ls.batch.length; i += step) batches.push([1 + i / bpe, Ls.batch[i]]);
+    const all = [...epoch, ...(F3 ? batches : [])].map((p) => p[1]).filter(isFinite);
+    const ymax = niceMax(Math.min(Math.max(...all) * 1.05, F3 ? 40 : 1));
+    const w = 520, h = 240, pad = { l: 46, r: 12, t: 12, b: 30 };
+    const a = axes(0, Ls.epoch.length, 0, ymax, w, h, pad, [0, 5, 10, 15, 20], ticks(ymax), (v) => v, (v) => +v.toFixed(2));
+    const clip = (pts) => pts.map((p) => [p[0], Math.min(ymax, p[1])]);
+    let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}`;
+    if (F3) s += `<path d="${path(clip(batches), a.sx, a.sy)}" stroke="var(--s2)" stroke-width="1" fill="none" opacity=".55"/>`;
+    s += `<path d="${path(clip(epoch), a.sx, a.sy)}" stroke="var(--s1)" stroke-width="2" fill="none"/>`;
+    if (F3) s += printed.map((p) => `<circle cx="${a.sx(p[0])}" cy="${a.sy(Math.min(ymax, p[1]))}" r="3.5" fill="var(--s3)" stroke="var(--surface)" stroke-width="1.5"/>`).join('');
+    s += `<line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--ink-3)" stroke-dasharray="3 3" style="display:none"/><text x="${w - pad.r}" y="${h - 4}" text-anchor="end">epoch</text></svg>`;
+    const nEpoch = L('loss ของทั้ง epoch', 'full-epoch loss'), nPrinted = L('ค่าที่โน้ตบุ๊กพิมพ์', 'printed (last batch)');
+    const series = [{ name: nEpoch, color: 'var(--s1)', pts: epoch }];
+    if (F3) series.push({ name: nPrinted, color: 'var(--s3)', pts: printed });
+    const legend = `<div class="legend-line"><span><span class="swatch" style="background:var(--s1)"></span>${L('loss ของข้อมูลเทรนทั้ง epoch', 'Training loss over the full epoch')}</span>${F3 ? `<span><span class="swatch" style="background:var(--s2)"></span>${L('ทุก mini-batch', 'Every mini-batch')}</span><span><span class="swatch" style="background:var(--s3)"></span>${L('ค่าที่โน้ตบุ๊กพิมพ์', 'What the notebook printed')}</span>` : ''}</div>`;
+    const txt = F3
+      ? `<p class="explain">${L('เมื่อค่าเงินบาทดิบมีหลักหมื่น และ learning rate = 1.0 การอัปเดตแต่ละครั้งจะเลยเป้า loss จึง<b>กระโดดไปมาแทนที่จะลดลง</b> การพิมพ์แค่ mini-batch สุดท้ายทำให้มองไม่เห็นปัญหานี้', 'With raw baht values in the thousands and a learning rate of 1.0, each update overshoots, so the loss <b>jumps around instead of going down</b>. Printing only the last mini-batch hides this.')}${Ls.diverged ? L(' น้ำหนักระเบิดแล้ว', ' The weights blew up.') : ''}</p>`
+      : `<p class="explain">${L('อินพุตถูก scale และ learning rate = 0.2: loss ของทั้ง epoch ลดลงอย่างราบรื่นแล้วนิ่ง นี่คือหน้าตาของการลู่เข้า (convergence)', 'Scaled inputs and a learning rate of 0.2: the full-epoch loss falls smoothly and flattens out, which is what convergence looks like.')}</p>`;
+    return { html: legend + `<div class="chart" id="ch">${s}<div class="tip" hidden></div></div>` + txt, after: (el) => hoverLine(el.querySelector('#ch'), w, pad, a.sx, series, (v) => 'epoch ' + v, (v) => v.toFixed(3)) };
+  }
+
+  function chartPR(m) {
+    const w = 520, h = 260, pad = { l: 40, r: 12, t: 12, b: 32 };
+    const c = { rep: E.prCurve(R.scores.yTest, R.scores.test), today: E.prCurve(R.scores.yToday, R.scores.today) };
+    if (state.released) c.next = E.prCurve(R.scores.yNext, R.scores.next);
+    const a = axes(0, 1, 0, 1, w, h, pad, [0, .25, .5, .75, 1], [0, .25, .5, .75, 1], (v) => v, (v) => v);
+    let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}`;
+    s += `<line x1="${a.sx(0)}" x2="${a.sx(1)}" y1="${a.sy(m.todayB.prauc)}" y2="${a.sy(m.todayB.prauc)}" stroke="var(--ink-3)" stroke-dasharray="4 4"/><text x="${a.sx(1) - 4}" y="${a.sy(m.todayB.prauc) - 6}" text-anchor="end">${L('สุ่มเดา = อัตราการย้าย', 'guessing = churn rate')}</text>`;
+    const draw = (pts, col) => `<path d="${path(pts.map((p) => [p.r, p.p]), a.sx, a.sy)}" stroke="${col}" stroke-width="2" fill="none" stroke-linejoin="round"/>`;
+    if (c.next) s += draw(c.next, 'var(--s3)');
+    s += draw(c.today, 'var(--s2)') + draw(c.rep, 'var(--s1)');
+    s += `<circle cx="${a.sx(m.today.recall)}" cy="${a.sy(m.today.precision || 0)}" r="5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"/>`;
+    s += `<text x="${a.sx(.5)}" y="${h - 4}" text-anchor="middle">recall</text></svg>`;
+    const legend = `<div class="legend-line"><span><span class="swatch" style="background:var(--s1)"></span>${L('Test set ของโน้ตบุ๊ก', 'Notebook test set')} · ${f3(m.rep.prauc)}</span><span><span class="swatch" style="background:var(--s2)"></span>${L('ม.ค. 2026', 'Jan 2026')} · ${f3(m.today.prauc)}</span>${c.next ? `<span><span class="swatch" style="background:var(--s3)"></span>${L('ก.พ. 2026', 'Feb 2026')} · ${f3(m.next.prauc)}</span>` : ''}</div>`;
+    const txt = `<p class="explain">${L(`แกนตั้งคือ precision แกนนอนคือ recall PR-AUC คือพื้นที่ใต้เส้นโค้ง จุดกลมคือตำแหน่งที่ threshold ปัจจุบัน (${m.th.toFixed(2)}) พาไปในเดือน ม.ค. ถ้าเส้นน้ำเงินกับส้มห่างกัน แปลว่า test set ของโน้ตบุ๊กไม่ได้บอกความจริงเรื่องการใช้งานจริง`, `Precision (y-axis) against recall (x-axis). PR-AUC is the area under each curve. The dot is where the current threshold (${m.th.toFixed(2)}) puts you in January. A gap between the blue and orange curves means the notebook's test set is not telling the truth about deployment.`)}</p>`;
+    return { html: legend + `<div class="chart">${s}</div>` + txt };
+  }
+
+  function chartCost(m) {
+    const F5 = state.flaws.F5;
+    const ths = []; for (let k = 1; k <= 60; k++) ths.push(k / 100);
+    const costs = ths.map((th) => { const c = E.confusion(R.scores.yTest, R.scores.test, th); return [th, (c.fn * E.COST_FN + c.fp * E.COST_FP) / R.scores.yTest.length * 1000]; });
+    const at50 = E.metrics(R.scores.yTest, R.scores.test, 0.5).costPer1000;
+    const ymax = niceMax(Math.max(...costs.map((c) => c[1]), at50) * 1.05);
+    const w = 520, h = 210, pad = { l: 58, r: 12, t: 12, b: 30 };
+    const a = axes(0, 0.6, 0, ymax, w, h, pad, [0, .1, .2, .3, .4, .5, .6], ticks(ymax), (v) => v.toFixed(1), (v) => '฿' + (v / 1000) + 'k');
+    let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}<path d="${path(costs, a.sx, a.sy)}" stroke="var(--s1)" stroke-width="2" fill="none"/>`;
+    s += `<line x1="${a.sx(Math.min(0.6, m.th))}" x2="${a.sx(Math.min(0.6, m.th))}" y1="${pad.t}" y2="${h - pad.b}" stroke="${F5 ? 'var(--flaw)' : 'var(--fixed)'}" stroke-width="1.5"/>`;
+    s += `<circle cx="${a.sx(Math.min(0.6, R.costTh))}" cy="${a.sy(costs[Math.min(59, Math.max(0, Math.round(R.costTh * 100) - 1))][1])}" r="5" fill="var(--fixed)" stroke="var(--surface)" stroke-width="2"/>`;
+    s += `<line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--ink-3)" stroke-dasharray="3 3" style="display:none"/><text x="${w - pad.r}" y="${h - 4}" text-anchor="end">threshold</text></svg>`;
+    const c = m.today, n = c.n, per = (v) => int(v / n * 1000);
+    const cm = `<div class="cm">
+      <span></span><span class="h">${L('โมเดล: จะย้าย', 'Model: will churn')}</span><span class="h">${L('โมเดล: จะอยู่', 'Model: will stay')}</span>
+      <span class="rh">${L('ย้ายจริง', 'Churned')}</span><div class="c tp"><span class="v">${per(c.tp)}</span><span class="k">${L('จับได้ ส่งข้อเสนอแล้ว', 'caught, offer sent')}</span></div><div class="c fn"><span class="v">${per(c.fn)}</span><span class="k">${L('หลุดไป', 'missed')} · ${baht(c.fn / n * 1000 * E.COST_FN)}</span></div>
+      <span class="rh">${L('อยู่จริง', 'Stayed')}</span><div class="c fp"><span class="v">${per(c.fp)}</span><span class="k">${L('ข้อเสนอเสียเปล่า', 'wasted offer')} · ${baht(c.fp / n * 1000 * E.COST_FP)}</span></div><div class="c tn"><span class="v">${per(c.tn)}</span><span class="k">${L('ปล่อยไว้', 'left alone')}</span></div></div>`;
+    const slider = `<div class="slider-row"><label for="th" class="small muted">Threshold</label><input type="range" id="th" min="0.01" max="0.6" step="0.01" value="${Math.min(0.6, m.th)}" ${F5 ? 'disabled' : ''}><span class="num">${m.th.toFixed(2)}</span></div>
+      <p class="small muted">${F5 ? L('ล็อกไว้ที่ 0.50 ระหว่างที่ F5 เปิดอยู่ ปิด F5 เพื่อเลือก threshold เอง', 'Locked at 0.50 while F5 is on. Turn F5 off to choose a threshold.') : `${L('ค่าที่ต้นทุนต่ำสุดบน validation data:', 'Cost-optimal on validation data:')} <b class="num">${R.costTh.toFixed(2)}</b>. ${state.threshold != null ? `<button class="btn" id="th-reset" style="padding:2px 8px;font-size:12px">${L('รีเซ็ต', 'Reset')}</button>` : ''}`}</p>`;
+    const txt = `<p class="explain">${L('ต้นทุนต่อลูกค้า 1,000 คนบน test set ของโน้ตบุ๊ก ในแต่ละ threshold พลาดลูกค้าที่จะย้าย 1 คนเสีย ฿8,000 ส่งข้อเสนอเสียเปล่า 1 ครั้งเสีย ฿500 threshold ที่ถูกที่สุดจึงต่ำกว่า 0.5 มาก', 'Cost per 1,000 customers on the notebook’s test set, for each threshold. A missed churner costs ฿8,000 and a wasted offer ฿500, so the cheapest threshold is far below 0.5.')}</p>`;
+    return {
+      html: slider + `<div class="chart" id="ch">${s}<div class="tip" hidden></div></div>` + txt + `<h3>${L('ต่อลูกค้า 1,000 คน ในเดือน ม.ค. 2026', 'Per 1,000 customers in January 2026')}</h3>` + cm,
+      after: (el) => {
+        hoverLine(el.querySelector('#ch'), w, pad, a.sx, [{ name: L('ต้นทุน', 'cost'), color: 'var(--s1)', pts: costs }], (v) => 'threshold ' + v.toFixed(2), (v) => baht(v) + L(' ต่อ 1,000 คน', ' per 1,000'));
+        const th = el.querySelector('#th');
+        if (th) {
+          th.addEventListener('input', () => { state.threshold = +th.value; th.nextElementSibling.textContent = (+th.value).toFixed(2); const mm = M(); renderBoard(mm); renderDiagram(mm); renderFlawCards(mm); });
+          th.addEventListener('change', () => renderTab());
+        }
+        const rs = el.querySelector('#th-reset'); if (rs) rs.addEventListener('click', () => { state.threshold = null; render(); });
+      },
+    };
+  }
+
+  function barList(items, fmt, opts = {}) {
+    const max = opts.max || Math.max(...items.map((i) => i.v), 1e-9);
+    return `<div style="display:grid;gap:5px">${items.map((i) => `
+      <div style="display:grid;grid-template-columns:minmax(0,180px) 1fr auto;gap:10px;align-items:center;font-size:12.5px" title="${esc(i.f)}: ${fmt(i.v)}">
+        <span class="mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${i.hot ? 'var(--flaw)' : 'var(--ink-2)'}">${esc(i.f)}</span>
+        <span style="height:12px;background:var(--surface-2);border-radius:3px;position:relative;overflow:hidden">
+          <span style="position:absolute;inset:0 auto 0 0;width:${Math.max(1, i.v / max * 100)}%;background:${i.hot ? 'var(--flaw)' : i.color || 'var(--s1)'};border-radius:0 4px 4px 0"></span>
+          ${opts.line ? `<span style="position:absolute;top:-2px;bottom:-2px;left:${opts.line / max * 100}%;border-left:1.5px dashed var(--ink-3)"></span>` : ''}
+        </span>
+        <span class="num" style="min-width:52px;text-align:right">${fmt(i.v)}</span>
+      </div>`).join('')}</div>`;
+  }
+  function chartFeatures() {
+    const items = R.importance.slice(0, 12).map((o) => ({ f: o.f, v: o.v, hot: o.f === 'retention_team_calls' }));
+    const leak = items.find((i) => i.hot);
+    const how = state.model === 'knn' ? L('สัดส่วนสัญญาณแบบตัวแปรเดียวในอินพุตที่ถูกเลือก (k-NN ไม่มีสัมประสิทธิ์)', 'Share of univariate signal among the selected inputs (k-NN has no coefficients).') : L('สัดส่วนน้ำหนักสัมประสิทธิ์ (|coef|) ในโมเดลที่เทรนแล้ว', 'Share of the absolute coefficient weight in the trained model.');
+    const msg = leak ? `<p class="explain">${L(`<b style="color:var(--flaw)">retention_team_calls</b> คิดเป็น ${pct(leak.v)} ของโมเดล คอลัมน์เดียวครองโมเดลแบบนี้คือสัญญาณคลาสสิกของ leakage ให้ถามว่าค่านี้รู้ได้เมื่อไร`, `<b style="color:var(--flaw)">retention_team_calls</b> carries ${pct(leak.v)} of the model. One column dominating is the classic sign of a leak: ask when that value becomes known.`)}</p>`
+      : `<p class="explain">${L('ไม่มีคอลัมน์ไหนครองโมเดล อินพุตที่ถูกเลือกเป็นค่าที่บริษัทรู้ในวันที่ให้คะแนนลูกค้า', 'No single column dominates. The selected inputs are ones the operator knows on the day it scores a customer.')}</p>`;
+    const noise = R.selected.some((x) => x.startsWith('survey_q'));
+    const sel = `<p class="small muted">${L(`SelectKBest เลือกไว้ ${R.selected.length} จาก ${state.flaws.F2 ? 42 : 41} อินพุต (k ได้จากการจูน)${noise ? ' คอลัมน์ survey_q บางตัวเป็น noise ล้วนที่ถูกเลือกโดยบังเอิญ' : ''}`, `SelectKBest kept ${R.selected.length} of ${state.flaws.F2 ? 42 : 41} inputs (k chosen by tuning).${noise ? ' Some survey_q columns are pure noise that got picked by chance.' : ''}`)}</p>`;
+    return { html: `<p class="small muted">${how}</p>` + barList(items, pct) + msg + sel };
+  }
+  function chartCalib() {
+    const rel = E.reliability(R.scores.yToday, R.scores.today, 10);
+    const w = 520, h = 250, pad = { l: 40, r: 12, t: 12, b: 32 };
+    const mx = niceMax(Math.max(0.2, ...rel.pts.map((p) => Math.max(p.pred, p.obs))));
+    const a = axes(0, mx, 0, mx, w, h, pad, ticks(mx), ticks(mx), (v) => +v.toFixed(2), (v) => +v.toFixed(2));
+    let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}<line x1="${a.sx(0)}" y1="${a.sy(0)}" x2="${a.sx(mx)}" y2="${a.sy(mx)}" stroke="var(--ink-3)" stroke-dasharray="4 4"/>`;
+    const pts = rel.pts.filter((p) => p.n >= 15);
+    s += `<path d="${path(pts.map((p) => [Math.min(mx, p.pred), Math.min(mx, p.obs)]), a.sx, a.sy)}" stroke="var(--s2)" stroke-width="2" fill="none"/>`;
+    s += pts.map((p) => `<circle cx="${a.sx(Math.min(mx, p.pred))}" cy="${a.sy(Math.min(mx, p.obs))}" r="${Math.min(9, 3 + Math.sqrt(p.n) / 8)}" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"><title>${L('ทำนาย', 'predicted')} ${pct(p.pred)} · ${L('จริง', 'observed')} ${pct(p.obs)} · ${p.n} ${L('เบอร์', 'lines')}</title></circle>`).join('');
+    s += `<text x="${a.sx(mx / 2)}" y="${h - 4}" text-anchor="middle">${L('ความน่าจะเป็นที่ทำนาย', 'predicted churn probability')}</text></svg>`;
+    const txt = state.flaws.F9
+      ? `<p class="explain">${L('เมื่อเปิด class weight จุดจะอยู่<b>ใต้เส้นทแยง</b>: โมเดลบอก 40% แต่คนที่ย้ายจริงน้อยกว่านั้นมาก อันดับ (PR-AUC) อาจดูดี ทั้งที่ความน่าจะเป็นผิด', 'With class weights on, the points sit <b>below the diagonal</b>: when the model says 40%, far fewer actually leave. Ranking (PR-AUC) can look fine while the probabilities are wrong.')}</p>`
+      : `<p class="explain">${L('จุดใกล้เส้นทแยงแปลว่าที่ทำนาย 10% ก็ย้ายจริงราว 10% จึงนำความน่าจะเป็นไปคำนวณต้นทุนได้', 'Points near the diagonal mean a predicted 10% really is about 10%. That is what lets you plug the probabilities into a cost calculation.')}</p>`;
+    return { html: `<p class="small muted">${L('ลูกค้าเดือน ม.ค. 2026 แบ่งเป็น 10 ช่วงความน่าจะเป็น ขนาดจุดบอกจำนวนเบอร์ในแต่ละช่วง', 'January 2026 customers, grouped into 10 probability bins. Dot size shows how many lines fall in each bin.')}</p><div class="chart">${s}</div><div class="kv"><div><span class="k">Calibration error</span><span class="v">${f3(rel.ece)}</span></div><div><span class="k">Log loss</span><span class="v">${f3(M().today.logloss)}</span></div></div>` + txt };
+  }
+  function chartDrift() {
+    const which = state.released ? state.driftWhich : (state.driftWhich === 'next' ? 'recent' : state.driftWhich);
+    const key = state.seed + ':' + which;
+    const d = driftCache.get(key);
+    const pick = `<div class="seg" role="group" aria-label="Compare"><button data-w="recent" aria-pressed="${which === 'recent'}">${L('ช่วง test ปี 2025', '2025 test period')}</button><button data-w="today" aria-pressed="${which === 'today'}">${L('ม.ค. 2026', 'Jan 2026')}</button><button data-w="next" aria-pressed="${which === 'next'}" ${state.released ? '' : `disabled title="${L('เปิดข้อมูล ก.พ. ก่อน', 'Release the Feb data first')}"`}>${L('ก.พ. 2026', 'Feb 2026')}</button></div>`;
+    if (!d) {
+      call({ type: 'drift', which }).then((res) => { driftCache.set(key, res); if (state.tab === 'drift') renderTab(); });
+      return { html: pick + `<p class="explain">${L('กำลังคำนวณ drift…', 'Computing drift…')}</p>`, after: bindDrift };
+    }
+    const items = d.features.slice(0, 10).map((o) => ({ f: o.f, v: o.psi, hot: o.psi > 0.2, color: o.psi > 0.1 ? 'var(--warn)' : 'var(--s1)' }));
+    const alerts = d.features.filter((o) => o.psi > 0.2), watch = d.features.filter((o) => o.psi > 0.1 && o.psi <= 0.2);
+    const advTxt = d.auc > 0.6
+      ? L(`classifier แยกแถวเก่ากับแถวใหม่ได้ (AUC ${f3(d.auc)}) แปลว่าข้อมูลใหม่<b>หน้าตาไม่เหมือนข้อมูลเทรน</b>`, `A classifier can tell old from new rows (AUC ${f3(d.auc)}), so the new data <b>does not look like the training data</b>.`)
+      : L(`classifier แยกแถวเก่ากับใหม่ไม่ได้ (AUC ${f3(d.auc)}, 0.5 = โยนเหรียญ) อินพุตจึงดูเหมือนเดิม แต่โมเดลยังแย่ลงได้ ถ้าความสัมพันธ์ระหว่างอินพุตกับการย้ายค่ายเปลี่ยน ซึ่งการเช็ก drift ของอินพุตมองไม่เห็น`, `A classifier cannot tell old from new rows (AUC ${f3(d.auc)}, 0.5 = coin flip), so the inputs look the same. The model can still get worse if the link between inputs and churn changes, which drift checks on inputs cannot see.`);
+    const rec = which === 'next' ? M().next.recall : M().today.recall;
+    const mon = `<div class="monitor">
+      <div><span>${L('PSI ของอินพุตใดเกิน 0.2', 'PSI above 0.2 on any input')}</span><span class="chip ${alerts.length ? 'bad' : 'good'}">${alerts.length ? L('เตือน: ', 'Alert: ') + alerts.map((x) => x.f).join(', ') : L('ปกติ', 'OK')}</span></div>
+      <div><span>${L('PSI 0.1 ถึง 0.2 (เฝ้าดู)', 'PSI 0.1 to 0.2 (watch)')}</span><span class="chip ${watch.length ? 'warn' : 'good'}">${watch.length ? watch.length + L(' อินพุต', watch.length > 1 ? ' inputs' : ' input') : L('ไม่มี', 'none')}</span></div>
+      <div><span>${L('AUC ของ adversarial validation เกิน 0.6', 'Adversarial validation AUC above 0.6')}</span><span class="chip ${d.auc > 0.6 ? 'bad' : 'good'}">${f3(d.auc)}</span></div>
+      ${which === 'next' ? `<div><span>${L('แพ็กเกจที่ไม่เคยเห็นตอนเทรน (5G Unlimited)', 'Plan type never seen in training (5G Unlimited)')}</span><span class="chip bad">${pct(d.newPlan)}${L(' ของเบอร์', ' of lines')}</span></div>` : ''}
+      <div><span>${L('recall ของลูกค้าที่ย้ายเดือนก่อน ต่ำกว่า 40%', "Recall on last month's labelled churners below 40%")}</span><span class="chip ${rec < 0.4 ? 'bad' : 'good'}">${pct(rec)}</span></div></div>`;
+    return {
+      html: pick + `<p class="small muted">${L('Population stability index (PSI) ของแต่ละอินพุต เทียบข้อมูลเทรนปี 2022–2024 กับช่วงที่เลือก เส้นประคือระดับเตือน 0.2', 'Population stability index (PSI) of each input, training years 2022 to 2024 against the selected period. The dashed line marks the 0.2 alert level.')}</p>` + barList(items, (v) => v.toFixed(3), { max: Math.max(0.3, ...items.map((i) => i.v)), line: 0.2 }) + `<p class="explain">${advTxt}</p><h3>${L('กฎการเฝ้าระวัง (monitoring)', 'Monitoring rules')}</h3>` + mon,
+      after: bindDrift,
+    };
+  }
+  function bindDrift(el) { el.querySelectorAll('[data-w]').forEach((b) => b.addEventListener('click', () => { state.driftWhich = b.dataset.w; renderTab(); })); }
+
+  const TABS = [
+    { id: 'loss', flaw: 'F3', fn: chartLoss }, { id: 'pr', fn: chartPR }, { id: 'cost', flaw: 'F5', fn: chartCost },
+    { id: 'feat', flaw: 'F2', fn: chartFeatures }, { id: 'calib', flaw: 'F9', fn: chartCalib }, { id: 'drift', fn: chartDrift },
+  ];
+  function renderTabs() {
+    $('tabs').innerHTML = TABS.map((x) => `<button role="tab" aria-selected="${state.tab === x.id}" data-t="${x.id}">${x.flaw && state.flaws[x.flaw] ? '<span class="dot" aria-hidden="true"></span>' : ''}${t('tabs')[x.id]}</button>`).join('');
+    $('tabs').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { state.tab = b.dataset.t; renderTabs(); renderTab(); }));
+  }
+  function renderTab() {
+    const x = TABS.find((y) => y.id === state.tab);
+    let out = x.fn(M());
+    if (typeof out === 'string') out = { html: out };
+    const el = $('tabpanel'); el.innerHTML = out.html; if (out.after) out.after(el);
+    $('ev-sub').textContent = state.model === 'knn' ? t('evKNN') : t('evLR');
+  }
+  function render() {
+    if (!R) return;
+    const m = M();
+    syncPresets(); renderBoard(m); renderDiagram(m); renderFlawCards(m); renderTabs(); renderTab();
+  }
+
+  // ================= guide =================
+  let hlEls = [];
+  function clearHL() { hlEls.forEach((el) => el.classList.remove('hl')); hlEls = []; }
+  function saveGuide() { try { localStorage.setItem('bpl-guide', JSON.stringify({ open: state.guideOpen, step: state.step })); } catch (e) {} }
+  function applyState(s, keepThreshold) {
+    if (!s) return;
+    if (s.flaws) state.flaws = { ...s.flaws };
+    if (s.model) state.model = s.model;
+    if ('released' in s) { state.released = s.released; if (s.released && !s.drift && state.driftWhich === 'recent') state.driftWhich = 'next'; }
+    if (s.tab) state.tab = s.tab;
+    if (s.drift) state.driftWhich = s.drift;
+    if (!keepThreshold) state.threshold = null;
+    state.ask = null; state.verdicts = {};
+    syncPresets();
+    if (R) render();
+    rerun();
+  }
+  function renderGuide(scroll) {
+    const n = STEPS.length, i = state.step, g = GT[lang][i];
+    $('dock').hidden = !state.guideOpen; $('dock-pill').hidden = state.guideOpen;
+    $('dock-pill').textContent = t('pill', i + 1, n);
+    $('dock-step').textContent = t('stepOf', i + 1, n);
+    $('dock-prog').innerHTML = STEPS.map((_, k) => `<button class="${k < i ? 'done' : k === i ? 'cur' : ''}" data-k="${k}" aria-label="${k + 1}"></button>`).join('');
+    $('dock-prog').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => goStep(+b.dataset.k)));
+    const gloss = i === 0 ? `<details class="gloss"><summary>${t('glossTitle')}</summary><dl>${GLOSS[lang].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></details>` : '';
+    $('dock-body').innerHTML = `<h3>${g.t}</h3>
+      <div class="gsec do"><span class="k">${t('kDo')}</span><div>${g.do.startsWith('<ul') ? g.do : `<p>${g.do}</p>`}</div></div>
+      <div class="gsec look"><span class="k">${t('kLook')}</span><p>${g.look}</p></div>
+      <div class="gsec why"><span class="k">${t('kWhy')}</span><p>${g.why}</p></div>${gloss}`;
+    $('dock-body').scrollTop = 0;
+    $('g-prev').disabled = i === 0;
+    $('g-next').textContent = i === n - 1 ? t('finish') : t('next');
+    $('g-do').hidden = !STEPS[i].act;
+    clearHL();
+    if (state.guideOpen) {
+      hlEls = STEPS[i].hl.map((id) => id === 'model-seg' ? $('model-lr').parentElement : $(id)).filter(Boolean);
+      hlEls.forEach((el) => el.classList.add('hl'));
+      if (scroll && hlEls[0]) hlEls[0].scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    }
+  }
+  function goStep(k) {
+    state.step = Math.max(0, Math.min(STEPS.length - 1, k));
+    saveGuide();
+    applyState(STEPS[state.step].setup);
+    renderGuide(true);
+  }
+  $('g-next').addEventListener('click', () => { if (state.step === STEPS.length - 1) { state.guideOpen = false; saveGuide(); renderGuide(); } else goStep(state.step + 1); });
+  $('g-prev').addEventListener('click', () => goStep(state.step - 1));
+  $('g-do').addEventListener('click', () => { const a = STEPS[state.step].act; if (a) applyState(a); });
+  $('dock-min').addEventListener('click', () => { state.guideOpen = false; saveGuide(); renderGuide(); });
+  $('dock-pill').addEventListener('click', () => { state.guideOpen = true; saveGuide(); renderGuide(true); });
+  $('open-guide').addEventListener('click', () => { state.guideOpen = true; saveGuide(); goStep(0); });
+
+  // ================= controls =================
+  $('preset-consultant').addEventListener('click', () => applyState({ flaws: CONSULTANT }));
+  $('preset-auditor').addEventListener('click', () => applyState({ flaws: AUDITOR }));
+  $('all-on').addEventListener('click', () => applyState({ flaws: Object.fromEntries(FIDS.map((f) => [f, true])) }));
+  $('all-off').addEventListener('click', () => applyState({ flaws: AUDITOR }));
+  $('model-lr').addEventListener('click', () => { state.model = 'lr'; syncPresets(); rerun(); });
+  $('model-knn').addEventListener('click', () => { state.model = 'knn'; syncPresets(); rerun(); });
+  $('predict-first').addEventListener('change', (e) => { state.predictFirst = e.target.checked; state.ask = null; renderAsk(); });
+  $('release').addEventListener('click', () => { state.released = true; state.driftWhich = 'next'; render(); });
+  $('relock').addEventListener('click', () => { state.released = false; if (state.driftWhich === 'next') state.driftWhich = 'recent'; render(); });
+  ['pred-prauc', 'pred-recall'].forEach((id) => $(id).addEventListener('input', () => { if (state.released && R) renderBoard(M()); }));
+  $('seed').addEventListener('change', async (e) => {
+    const v = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 11)); e.target.value = v;
+    state.seed = v; $('busy').hidden = false; await call({ type: 'build', seed: v }); rerun();
+  });
+  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); };
+  $('lang-th').addEventListener('click', () => setLang('th'));
+  $('lang-en').addEventListener('click', () => setLang('en'));
+
+  // ================= boot =================
+  buildFlaws(); applyStatic(); flawText(); syncPresets();
+  if (state.guideOpen) { const s = STEPS[state.step].setup; if (s) { if (s.flaws) state.flaws = { ...s.flaws }; if (s.model) state.model = s.model; if ('released' in s) state.released = s.released; if (s.tab) state.tab = s.tab; if (s.drift) state.driftWhich = s.drift; syncPresets(); } }
+  renderGuide(false);
+  call({ type: 'build', seed: state.seed }).then(rerun);
+})();
+</script>
+
+</body>
+</html>
