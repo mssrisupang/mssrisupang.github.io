@@ -232,6 +232,10 @@ table.stats td { font-family: var(--f-mono); }
 table.stats.dict td { vertical-align: top; font-family: var(--f-body); }
 table.stats.dict td.mono { font-family: var(--f-mono); }
 .dock table.stats { min-width: 0; font-size: 12.5px; }
+.dock table.stats td, .dock table.stats th { white-space: normal; }
+.dock.expanded { width: min(max(50vw, 430px), calc(100vw - 32px)); max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.dock.expanded table.stats { font-size: 13px; }
+.dock-head .acts { display: flex; gap: 4px; }
 @media (max-width: 900px) { .eda-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* highlight for the guide */
@@ -279,6 +283,7 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
   h1 { font-size: 26px; }
   .wrap { padding-inline: 16px; }
   .dock { right: 8px; left: 8px; width: auto; max-height: 58vh; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .dock.expanded { width: auto; max-height: calc(100vh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -398,7 +403,7 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
 </div>
 
 <aside class="dock" id="dock" aria-label="Guide" hidden>
-  <div class="dock-head"><span class="eyebrow" id="dock-step"></span><button id="dock-min" data-i="minimize"></button></div>
+  <div class="dock-head"><span class="eyebrow" id="dock-step"></span><div class="acts"><button id="dock-exp"></button><button id="dock-min" data-i="minimize"></button></div></div>
   <div class="dock-prog" id="dock-prog"></div>
   <div class="dock-body" id="dock-body"></div>
   <div class="dock-foot">
@@ -920,7 +925,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       count: (n, N) => `มีข้อผิดพลาด <b>${n}</b> จาก ${N} จุด`,
       footer: 'ข้อมูลสังเคราะห์: 20,000 บัญชี (ราว 32,000 เบอร์) ม.ค. 2022 ถึง ธ.ค. 2025 อัตราย้ายค่ายราว 4.4% พลาดลูกค้าที่จะย้าย 1 คนเสียรายได้ ฿8,000 ส่งข้อเสนอให้คนที่ไม่ได้จะย้ายเสีย ฿500 ทุกตัวเลขคำนวณสดในเบราว์เซอร์ของคุณ',
       seed: 'Dataset seed',
-      minimize: 'ย่อ ▾', doIt: 'ทำให้ดู', prev: '← ก่อนหน้า', next: 'ถัดไป →', finish: 'จบคู่มือ',
+      expand: 'ขยาย ⤢', shrink: 'ขนาดปกติ ⤡', minimize: 'ย่อ ▾', doIt: 'ทำให้ดู', prev: '← ก่อนหน้า', next: 'ถัดไป →', finish: 'จบคู่มือ',
       pill: (i, n) => `คู่มือ · ขั้น ${i}/${n}`, stepOf: (i, n) => `คู่มือทีละขั้น · ขั้น ${i}/${n}`,
       kDo: 'ทำ', kLook: 'ดูตรงไหน', kWhy: 'ทำไมสำคัญ',
       glossTitle: 'คำศัพท์ที่ใช้ในหน้านี้',
@@ -963,7 +968,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       count: (n, N) => `<b>${n}</b> of ${N} flaws present`,
       footer: 'Synthetic data: 20,000 accounts (about 32,000 phone lines), Jan 2022 to Dec 2025, about 4.4% churn. A missed churner costs ฿8,000 in lost revenue; a retention offer to someone who would have stayed costs ฿500. Every number is computed live in your browser.',
       seed: 'Dataset seed',
-      minimize: 'Minimise ▾', doIt: 'Do it for me', prev: '← Back', next: 'Next →', finish: 'Finish',
+      expand: 'Expand ⤢', shrink: 'Normal size ⤡', minimize: 'Minimise ▾', doIt: 'Do it for me', prev: '← Back', next: 'Next →', finish: 'Finish',
       pill: (i, n) => `Guide · step ${i}/${n}`, stepOf: (i, n) => `Step-by-step guide · step ${i}/${n}`,
       kDo: 'Do', kLook: 'Look at', kWhy: 'Why it matters',
       glossTitle: 'Terms used on this page',
@@ -1830,7 +1835,11 @@ if (typeof module !== 'undefined') module.exports = Engine;
     if (R) render();
     rerun();
   }
+  try { state.dockBig = localStorage.getItem('bpl-dock-big') === '1'; } catch (e) { state.dockBig = false; }
   function renderGuide(scroll) {
+    $('dock').classList.toggle('expanded', !!state.dockBig);
+    $('dock-exp').textContent = state.dockBig ? t('shrink') : t('expand');
+    $('dock-exp').setAttribute('aria-pressed', !!state.dockBig);
     const n = STEPS.length, i = state.step, g = GT[lang][i];
     $('dock').hidden = !state.guideOpen; $('dock-pill').hidden = state.guideOpen;
     $('dock-pill').textContent = t('pill', i + 1, n);
@@ -1865,6 +1874,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   $('g-prev').addEventListener('click', () => goStep(state.step - 1));
   $('g-do').addEventListener('click', () => { const a = STEPS[state.step].act; if (a) applyState(a); });
   $('dock-min').addEventListener('click', () => { state.guideOpen = false; saveGuide(); renderGuide(); });
+  $('dock-exp').addEventListener('click', () => { state.dockBig = !state.dockBig; try { localStorage.setItem('bpl-dock-big', state.dockBig ? '1' : '0'); } catch (e) {} renderGuide(); });
   $('dock-pill').addEventListener('click', () => { state.guideOpen = true; saveGuide(); renderGuide(true); });
   $('open-guide').addEventListener('click', () => { state.guideOpen = true; saveGuide(); goStep(0); });
 
