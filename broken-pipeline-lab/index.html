@@ -245,6 +245,21 @@ footer { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap;
 .info-btn[aria-expanded="true"] { background: var(--accent); color: #fff; }
 .seed-ctl input#seed { width: 140px; height: auto; min-height: 38px; padding: 6px 10px; font-size: 16px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); }
 
+/* summary (zone 4) */
+.sum-body { display: grid; gap: 18px; }
+.verdict-box { border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; font-size: 14px; border: 1px solid var(--rule); }
+.verdict-box.bad { background: var(--flaw-soft); border-color: color-mix(in srgb, var(--flaw) 35%, var(--rule)); }
+.verdict-box.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, var(--rule)); }
+.verdict-box.good { background: var(--fixed-soft); border-color: color-mix(in srgb, var(--fixed) 35%, var(--rule)); }
+.verdict-box h3 { font-size: 17px; }
+table.stats.interp td { white-space: normal; vertical-align: top; font-family: var(--f-body); text-align: left; }
+table.stats.interp td.num { font-family: var(--f-mono); white-space: nowrap; text-align: right; }
+.learn { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.learn div { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; font-size: 13.5px; }
+.learn b { font-size: 14px; }
+.learn .tag { justify-self: start; }
+.discuss { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+
 /* EDA */
 .eda-body { display: grid; gap: 18px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -451,6 +466,11 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
       <div class="tabpanel" id="tabpanel" role="tabpanel"></div>
     </section>
   </div>
+
+  <section class="panel" id="sum-panel" aria-labelledby="sum-h">
+    <div class="panel-head"><div class="zone-head"><span class="zone">4</span><h2 id="sum-h" data-i="zone4"></h2></div><span class="small muted" data-i="zone4sub"></span></div>
+    <div class="panel-body sum-body" id="sum-body"></div>
+  </section>
 
   <footer>
     <span data-i="footer"></span>
@@ -975,6 +995,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       sbScores: (a, b) => `โน้ตบุ๊ก ${a} · ม.ค. ${b}`,
       zone1: 'ผลคะแนน: สิ่งที่รายงาน เทียบกับความจริง', zone1sub: 'เป้าหมายคือให้ช่องซ้ายใกล้ช่องกลางที่สุด ไม่ใช่ให้ช่องซ้ายสูงที่สุด',
       zone0: 'สำรวจข้อมูลก่อนวิเคราะห์ (EDA)', edaAll: 'ทั้งหมด 2022–2025', edaTrain: 'เฉพาะ train 2022–2024', edaHide: 'ซ่อนส่วนนี้ ▴', edaShow: 'แสดงส่วนสำรวจข้อมูล ▾',
+      zone4: 'สรุปและอภิปรายผล', zone4sub: 'อัปเดตตามสวิตช์และโมเดลที่เลือกอยู่ตอนนี้',
       zone2: 'ไปป์ไลน์ และสวิตช์ข้อผิดพลาด', zone3: 'หลักฐาน',
       repLabel: 'สิ่งที่โน้ตบุ๊กรายงาน', todayLabel: 'ใช้งานจริง · ม.ค. 2026', nextLabel: 'เดือนถัดไป · ก.พ. 2026',
       busy: 'กำลังเทรนใหม่…',
@@ -1029,6 +1050,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       sbScores: (a, b) => `Notebook ${a} · Jan ${b}`,
       zone1: 'Scores: what is reported vs. what is real', zone1sub: 'The goal is to make the left column match the middle one, not to make the left one high.',
       zone0: 'Explore the data first (EDA)', edaAll: 'All 2022–2025', edaTrain: 'Training only 2022–2024', edaHide: 'Hide this section ▴', edaShow: 'Show data exploration ▾',
+      zone4: 'Discussion and conclusion', zone4sub: 'Updates with the switches and model you have selected',
       zone2: 'Pipeline and flaw switches', zone3: 'Evidence',
       repLabel: 'What the notebook reports', todayLabel: 'Real deployment · Jan 2026', nextLabel: 'Next month · Feb 2026',
       busy: 'Retraining…',
@@ -1175,7 +1197,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     { setup: { flaws: AUDITOR, model: 'lr', tab: 'calib' }, act: { flaws: { ...AUDITOR, F9: true } }, hl: ['card-F9', 'ev-panel'] },
     { setup: { flaws: AUDITOR, model: 'lr', released: false }, act: { released: true }, hl: ['cell-today', 'cell-next'] },
     { setup: { flaws: AUDITOR, model: 'lr', released: true, tab: 'drift', drift: 'next' }, hl: ['ev-panel', 'cell-next'] },
-    { setup: null, hl: ['flaw-bar'] },
+    { setup: null, hl: ['flaw-bar', 'sum-panel'] },
   ];
   const GT = {
     th: [
@@ -1649,6 +1671,104 @@ if (typeof module !== 'undefined') module.exports = Engine;
     apply();
   }
 
+
+  // ================= zone 4: discussion & conclusion =================
+  function renderSummary(m) {
+    const F = state.flaws, on = FIDS.filter((f) => F[f]);
+    const rep_ = m.rep, jan = m.today, base = m.todayB;
+    const gap = rep_.prauc - jan.prauc;
+    const accGap = rep_.accuracy - m.repB.accuracy;
+    const lift = jan.prauc / Math.max(1e-9, base.prauc);
+    const saving = base.costPer1000 - jan.costPer1000;
+    const pts = (v) => Math.round(v * 100);
+
+    // 1) verdict
+    let cls, head, body;
+    if (on.length && (gap > 0.05 || (F.F4 && Math.abs(accGap) < 0.01))) {
+      cls = 'bad';
+      head = L('ข้อสรุป: ยังเชื่อตัวเลขในโน้ตบุ๊กไม่ได้', 'Verdict: the notebook’s numbers cannot be trusted yet');
+      body = L(`ยังมีข้อผิดพลาด ${on.length} จุด (${on.join(', ')}) ${F.F4 ? `โน้ตบุ๊กรายงาน accuracy ${pct(rep_.accuracy)} ซึ่งเท่ากับการทายว่าไม่มีใครย้าย ` : `PR-AUC ที่รายงาน (${f3(rep_.prauc)}) สูงกว่าผลจริงเดือน ม.ค. (${f3(jan.prauc)}) อยู่ ${f3(gap)} `}ห้ามนำไปใช้จนกว่าจะแก้ครบ`,
+        `${on.length} flaw(s) remain (${on.join(', ')}). ${F.F4 ? `The notebook reports ${pct(rep_.accuracy)} accuracy, the same as predicting that nobody leaves. ` : `The reported PR-AUC (${f3(rep_.prauc)}) is ${f3(gap)} above January reality (${f3(jan.prauc)}). `}Do not deploy until they are fixed.`);
+    } else if (on.length) {
+      cls = 'warn';
+      head = L('ข้อสรุป: ตัวเลขใกล้ความจริง แต่กระบวนการยังผิด', 'Verdict: the numbers are close to reality, but the process is still wrong');
+      body = L(`คะแนนที่รายงานต่างจาก ม.ค. แค่ ${f3(Math.abs(gap))} แต่ยังมีข้อผิดพลาด ${on.join(', ')} ซึ่งอาจทำให้พลาดกับข้อมูลชุดอื่นหรือเดือนอื่น`,
+        `The reported score is only ${f3(Math.abs(gap))} from January, but ${on.join(', ')} remain and can bite on other data or other months.`);
+    } else {
+      cls = saving > 0 && jan.recall >= 0.3 ? 'good' : 'warn';
+      head = cls === 'good' ? L('ข้อสรุป: ใช้งานได้ แบบมีเงื่อนไข', 'Verdict: deploy, with conditions') : L('ข้อสรุป: ตัวเลขซื่อสัตย์ แต่โมเดลยังไม่คุ้ม', 'Verdict: honest numbers, but the model does not pay off yet');
+      body = L(`ไปป์ไลน์ไม่มีข้อผิดพลาดแล้ว คะแนนที่รายงาน (${f3(rep_.prauc)}) ใกล้ผลจริงเดือน ม.ค. (${f3(jan.prauc)}) โมเดลจับลูกค้าที่จะย้ายได้ ${pts(jan.recall)} จาก 100 คน และ${saving > 0 ? `ประหยัดได้ ${baht(saving)} ต่อลูกค้า 1,000 คน เทียบกับไม่ทำอะไรเลย` : `ยังเสียมากกว่าการไม่ทำอะไรเลย ${baht(-saving)} ต่อ 1,000 คน`} เงื่อนไข: ต้องเฝ้าระวัง drift ทุกเดือนและเทรนใหม่เมื่อข้อมูลเปลี่ยน${state.released ? ` (ในเดือน ก.พ. recall ลดเหลือ ${pct(m.next.recall)})` : ''}`,
+        `The pipeline has no flaws left. The reported score (${f3(rep_.prauc)}) is close to January reality (${f3(jan.prauc)}). The model catches ${pts(jan.recall)} of every 100 churners and ${saving > 0 ? `saves ${baht(saving)} per 1,000 customers compared with doing nothing` : `still costs ${baht(-saving)} per 1,000 customers more than doing nothing`}. Condition: monitor drift every month and retrain when the data changes${state.released ? ` (in February recall fell to ${pct(m.next.recall)})` : ''}.`);
+    }
+    const verdict = `<div class="verdict-box ${cls}"><h3>${head}</h3><p>${body}</p></div>`;
+
+    // 2) what each indicator in zone 1 means, read against the current numbers
+    const R2 = (a, b) => `${a} → ${b}`;
+    const rows = [
+      ['Accuracy', L('สัดส่วนที่ทายถูกทั้งหมด', 'Share of all predictions that are right'), R2(pct(rep_.accuracy), pct(jan.accuracy)),
+        Math.abs(accGap) < 0.01 ? L(`เท่ากับ baseline (${pct(m.repB.accuracy)}) จึงไม่ได้บอกว่าโมเดลดี เพราะลูกค้าส่วนใหญ่ไม่ย้ายอยู่แล้ว`, `Equal to the baseline (${pct(m.repB.accuracy)}), so it says nothing: most customers stay anyway.`)
+          : L(`ต่างจาก baseline ${pts(Math.abs(accGap))} จุด แต่ยังไม่ควรใช้ตัดสินเพียงตัวเดียวเมื่อข้อมูลไม่สมดุล`, `Differs from the baseline by ${pts(Math.abs(accGap))} points, but never judge an imbalanced problem on accuracy alone.`)],
+      ['PR-AUC', L('คุณภาพการจัดอันดับลูกค้าที่เสี่ยงย้าย 1.0 = สมบูรณ์แบบ สุ่มเดา = อัตราการย้าย', 'How well risky customers are ranked. 1.0 = perfect; guessing = churn rate'), R2(f3(rep_.prauc), f3(jan.prauc)),
+        L(`ม.ค. ดีกว่าสุ่มเดา (${f3(base.prauc)}) ราว ${lift.toFixed(1)} เท่า ${gap > 0.05 ? `แต่โน้ตบุ๊กรายงานสูงเกินจริง ${f3(gap)}` : 'และโน้ตบุ๊กรายงานใกล้ความจริง'}`, `January is about ${lift.toFixed(1)}× better than guessing (${f3(base.prauc)}). ${gap > 0.05 ? `The notebook overstates it by ${f3(gap)}.` : 'The notebook report is close to reality.'}`)],
+      ['Recall', L('ในลูกค้าที่ย้ายจริง จับได้กี่ %', 'Of the customers who really churned, the share caught'), R2(pct(rep_.recall), pct(jan.recall)),
+        L(`จับได้ ${pts(jan.recall)} จาก 100 คนที่จะย้าย ${jan.recall < 0.05 ? '(แทบไม่ได้ช่วยอะไร ดู threshold F5)' : ''}`, `Catches ${pts(jan.recall)} of every 100 churners${jan.recall < 0.05 ? ' (almost useless; check the threshold, F5)' : ''}.`)],
+      ['Precision', L('ในลูกค้าที่ได้ข้อเสนอ ย้ายจริงกี่ %', 'Of the customers who got an offer, the share who really churned'), R2(pct(rep_.precision), pct(jan.precision)),
+        L(`ส่งข้อเสนอ 100 ครั้ง ถูกคน ${pts(jan.precision)} ครั้ง ที่เหลือคือต้นทุนที่ยอมจ่ายเพื่อจับคนที่จะย้าย`, `Of 100 offers, ${pts(jan.precision)} reach a real churner; the rest is the price of catching them.`)],
+      ['Log loss', L('ความน่าจะเป็นที่ทำนายตรงความจริงแค่ไหน ยิ่งต่ำยิ่งดี', 'How close the predicted probabilities are to reality. Lower is better'), R2(f3(rep_.logloss), f3(jan.logloss)),
+        jan.logloss < base.logloss ? L(`ดีกว่าการทายค่าเฉลี่ยให้ทุกคน (${f3(base.logloss)})`, `Better than predicting the average for everyone (${f3(base.logloss)}).`)
+          : L(`แย่กว่าการทายค่าเฉลี่ยให้ทุกคน (${f3(base.logloss)}) ความน่าจะเป็นใช้คำนวณต้นทุนไม่ได้ (ดู F3, F9)`, `Worse than predicting the average for everyone (${f3(base.logloss)}); the probabilities cannot be used for costs (see F3, F9).`)],
+      [L('ต่อลูกค้า 1,000 คน', 'Per 1,000 customers'), L('จับได้ / หลุดไป / ข้อเสนอเสียเปล่า', 'caught / missed / wasted offers'), `${int(jan.per1000.caught)} / ${int(jan.per1000.missed)} / ${int(jan.per1000.wasted)}`,
+        L(`ม.ค. 2026: จับได้ ${int(jan.per1000.caught)} คน หลุด ${int(jan.per1000.missed)} คน และส่งข้อเสนอให้คนที่ไม่ได้จะย้าย ${int(jan.per1000.wasted)} ครั้ง`, `January 2026: ${int(jan.per1000.caught)} caught, ${int(jan.per1000.missed)} missed, ${int(jan.per1000.wasted)} offers to customers who would have stayed.`)],
+      [L('ต้นทุนต่อ 1,000 คน', 'Cost per 1,000'), L('หลุด 1 คน ฿8,000 + ข้อเสนอเสียเปล่า ฿500', 'missed churner ฿8,000 + wasted offer ฿500'), R2(baht(rep_.costPer1000), baht(jan.costPer1000)),
+        saving > 0 ? L(`ประหยัด ${baht(saving)} เทียบกับไม่ทำอะไรเลย (${baht(base.costPer1000)})`, `Saves ${baht(saving)} compared with doing nothing (${baht(base.costPer1000)}).`)
+          : L(`เสียมากกว่าการไม่ทำอะไรเลย (${baht(base.costPer1000)}) อยู่ ${baht(-saving)}`, `Costs ${baht(-saving)} more than doing nothing (${baht(base.costPer1000)}).`)],
+    ];
+    const hd = lang === 'th' ? ['ตัวชี้วัด', 'ความหมาย', 'โน้ตบุ๊ก → ม.ค.', 'อ่านผลตอนนี้'] : ['Metric', 'Meaning', 'Notebook → Jan', 'What it says now'];
+    const table = `<div><h3>${L('ตัวชี้วัดในโซน ① หมายความว่าอะไร', 'What each indicator in zone ① means')}</h3>
+      <div class="stats-wrap"><table class="stats interp"><thead><tr>${hd.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(([a, b, c, d]) => `<tr><td><b>${a}</b></td><td>${b}</td><td class="num">${c}</td><td>${d}</td></tr>`).join('')}</tbody></table></div></div>`;
+
+    // 3) what we learnt
+    const learn = (lang === 'th' ? [
+      ['F4, F5 · Lab 5', 'อย่าเชื่อ accuracy เมื่อข้อมูลไม่สมดุล', 'เทียบกับ baseline เสมอ ใช้ PR-AUC, recall และเลือก threshold จากต้นทุนธุรกิจ ไม่ใช่ 0.5'],
+      ['F2 · Lab 1', 'ถามทุกคอลัมน์ว่า “รู้ค่าได้เมื่อไร”', 'คอลัมน์ที่เกิดหลังผลลัพธ์ทำให้คะแนนดีเกินจริง แต่ใช้จริงไม่ได้ (target leakage)'],
+      ['F1 · Lab 1', 'fit ทุกขั้นใน Pipeline บน train เท่านั้น', 'scaler, imputer, feature selection ที่เห็น test set ทำให้การประเมินไม่ซื่อสัตย์ แม้ตัวเลขจะเปลี่ยนนิดเดียว'],
+      ['F3 · Lab 2', 'scale ข้อมูล และดู loss ทั้ง epoch', 'อินพุตต่างสเกลกับ learning rate สูงทำให้ gradient descent ไม่ลู่เข้า'],
+      ['F6, F8 · Lab 4', 'แบ่งข้อมูลให้เหมือนตอนใช้งานจริง', 'ข้อมูลตามเวลาต้องแบ่งตามเวลา ลูกค้าคนเดียวกันต้องอยู่ฝั่งเดียว (GroupKFold)'],
+      ['F7 · Lab 4', 'ใช้ test set ครั้งเดียว', 'จูนบน validation เท่านั้น ถ้าเลือกโมเดลจาก test คะแนน test ไม่ใช่การประเมินที่ซื่อสัตย์อีกต่อไป'],
+      ['F9 · Lab 3', 'ความน่าจะเป็นต้องตรงความจริง', 'จัดอันดับถูก (PR-AUC ดี) ไม่ได้แปลว่าความน่าจะเป็นถูก ตรวจด้วย calibration และ log loss'],
+      ['Drift · Lab 6', 'คะแนนวันนี้ไม่รับประกันเดือนหน้า', 'ตรวจ drift ด้วย PSI และ adversarial validation เฝ้าระวัง และเทรนใหม่เมื่อข้อมูลเปลี่ยน'],
+    ] : [
+      ['F4, F5 · Lab 5', 'Never trust accuracy on imbalanced data', 'Always compare with a baseline, use PR-AUC and recall, and pick the threshold from business costs, not 0.5.'],
+      ['F2 · Lab 1', 'Ask of every column: when is it known?', 'A column created after the outcome inflates the score but cannot be used in production (target leakage).'],
+      ['F1 · Lab 1', 'Fit every step inside a Pipeline, on train only', 'Scalers, imputers and feature selection that see the test set make the evaluation dishonest, even when the number barely moves.'],
+      ['F3 · Lab 2', 'Scale inputs and watch the full-epoch loss', 'Mixed scales plus a high learning rate stop gradient descent from converging.'],
+      ['F6, F8 · Lab 4', 'Split the data the way it will be used', 'Time-ordered data needs a time split; one customer must stay on one side (GroupKFold).'],
+      ['F7 · Lab 4', 'Use the test set once', 'Tune on validation only. Once the test set picks the model, its score is no longer honest.'],
+      ['F9 · Lab 3', 'Probabilities must match reality', 'Good ranking (PR-AUC) does not mean good probabilities. Check calibration and log loss.'],
+      ['Drift · Lab 6', 'Today’s score does not guarantee next month', 'Detect drift with PSI and adversarial validation, monitor, and retrain when the data changes.'],
+    ]).map(([tag, h, p]) => `<div><span class="tag">${tag}</span><b>${h}</b><span class="muted">${p}</span></div>`).join('');
+
+    // 4) discussion questions
+    const qs = lang === 'th' ? [
+      'ถ้าคุณเป็นผู้จัดการ จะอนุมัติให้ใช้โมเดลนี้ไหม? ใช้ตัวเลขไหนในโซน ① เป็นเหตุผล',
+      'ข้อผิดพลาดข้อไหนอันตรายที่สุด: ข้อที่ทำให้คะแนนพุ่งสูง (F2) หรือข้อที่ทำให้คะแนนเปลี่ยนนิดเดียวแต่กระบวนการผิด (F1, F7)? เพราะอะไร',
+      'ถ้าต้นทุนการพลาดลูกค้า 1 คนลดจาก ฿8,000 เป็น ฿2,000 threshold ที่เหมาะสมจะเปลี่ยนไปทางไหน?',
+      'เดือน ก.พ. ข้อมูลเปลี่ยน ควรตั้งกฎเตือนอะไร และควรเทรนใหม่เมื่อไร?',
+      'ใน assignment จริง (ข้อมูลสินเชื่อ) จะตรวจหาข้อผิดพลาดแต่ละข้อด้วยหลักฐานอะไร?',
+    ] : [
+      'If you were the manager, would you approve this model? Which numbers in zone ① support your answer?',
+      'Which flaw is most dangerous: one that inflates the score (F2) or one that barely moves it but breaks the process (F1, F7)? Why?',
+      'If a missed churner cost ฿2,000 instead of ฿8,000, which way would the best threshold move?',
+      'The data shifts in February. Which alert rules would you set, and when would you retrain?',
+      'In the real assignment (loan data), what evidence would you use to find each flaw?',
+    ];
+
+    $('sum-body').innerHTML = verdict + table
+      + `<div><h3>${L('สิ่งที่ได้เรียนรู้', 'What we learnt')}</h3><div class="learn">${learn}</div></div>`
+      + `<div><h3>${L('คำถามอภิปรายในชั้นเรียน', 'Questions for class discussion')}</h3><ol class="discuss">${qs.map((q) => `<li>${q}</li>`).join('')}</ol></div>`;
+  }
+
   // ================= charts =================
   function axes(x0, x1, y0, y1, w, h, pad, xt, yt, xfmt, yfmt, titles) {
     const sx = (v) => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r);
@@ -1755,7 +1875,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
         hoverLine(el.querySelector('#ch'), w, pad, a.sx, [{ name: L('ต้นทุน', 'cost'), color: 'var(--s1)', pts: costs }], (v) => 'threshold ' + v.toFixed(2), (v) => baht(v) + L(' ต่อ 1,000 คน', ' per 1,000'));
         const th = el.querySelector('#th');
         if (th) {
-          th.addEventListener('input', () => { state.threshold = +th.value; th.nextElementSibling.textContent = (+th.value).toFixed(2); const mm = M(); renderBoard(mm); renderDiagram(mm); renderFlawCards(mm); });
+          th.addEventListener('input', () => { state.threshold = +th.value; th.nextElementSibling.textContent = (+th.value).toFixed(2); const mm = M(); renderBoard(mm); renderDiagram(mm); renderFlawCards(mm); renderSummary(mm); });
           th.addEventListener('change', () => renderTab());
         }
         const rs = el.querySelector('#th-reset'); if (rs) rs.addEventListener('click', () => { state.threshold = null; render(); });
@@ -1848,7 +1968,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   function render() {
     if (!R) return;
     const m = M();
-    syncPresets(); renderBoard(m); renderDiagram(m); renderFlawCards(m); renderTabs(); renderTab();
+    syncPresets(); renderBoard(m); renderDiagram(m); renderFlawCards(m); renderTabs(); renderTab(); renderSummary(m);
   }
 
   // ================= EDA =================
