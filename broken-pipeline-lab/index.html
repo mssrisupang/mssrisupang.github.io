@@ -116,7 +116,18 @@ header.top .lede { color: var(--ink-2); font-size: 15px; }
 .chip.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
 .chip.neutral { background: var(--surface-2); color: var(--ink-2); border-color: var(--rule); }
 .busy { position: absolute; top: 12px; right: 16px; }
-.locked { display: grid; gap: 10px; }
+.locked { display: grid; gap: 8px; }
+.feb-q { font-weight: 600; font-size: 14.5px; }
+.feb-guess summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+.feb-guess .predict-row { margin-top: 6px; }
+.feb-ans { display: grid; gap: 6px; font-size: 13.5px; }
+.feb-ans .rowc { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; }
+.feb-ans .rowc .k { color: var(--ink-3); font-size: 12.5px; }
+.feb-ans .rowc .v { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.feb-ans .down { color: var(--flaw); } .feb-ans .up { color: var(--fixed); }
+.feb-ans .why { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.feb-ans .lesson { border-left: 3px solid var(--accent); padding-left: 8px; color: var(--ink-2); }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
 .predict-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .predict-row label { display: grid; gap: 3px; font-size: 12px; color: var(--ink-3); }
 .predict-row input { width: 92px; padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--surface); font-family: var(--f-mono); }
@@ -350,17 +361,20 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
       <div class="label"><span class="swatch" style="background:var(--s3)"></span><span class="eyebrow" data-i="nextLabel"></span></div>
       <div id="next-locked" class="locked">
         <p class="sub" data-i="nextLocked"></p>
-        <div class="predict-row">
-          <label for="pred-prauc">PR-AUC<input id="pred-prauc" inputmode="decimal" placeholder="0.15"></label>
-          <label for="pred-recall">Recall %<input id="pred-recall" inputmode="decimal" placeholder="40"></label>
-          <button class="btn primary" id="release" data-i="release"></button>
-        </div>
+        <p class="feb-q" data-i="nextQuestion"></p>
+        <p class="sub" id="next-ref"></p>
+        <details class="feb-guess"><summary data-i="guessToggle"></summary>
+          <div class="predict-row">
+            <label for="pred-prauc">PR-AUC<input id="pred-prauc" inputmode="decimal" placeholder="0.15"></label>
+            <label for="pred-recall">Recall %<input id="pred-recall" inputmode="decimal" placeholder="40"></label>
+          </div>
+        </details>
+        <button class="btn primary" id="release" data-i="release" style="justify-self:start"></button>
       </div>
       <div id="next-open" hidden>
         <div class="big" id="next-big">–</div>
         <div class="acc" id="next-acc"></div>
-        <div class="sub" id="next-sub"></div>
-        <div id="next-chip"></div>
+        <div class="feb-ans" id="next-ans"></div>
         <button class="btn" id="relock" style="justify-self:start;margin-top:4px" data-i="relock"></button>
       </div>
     </div>
@@ -919,7 +933,10 @@ if (typeof module !== 'undefined') module.exports = Engine;
       zone2: 'ไปป์ไลน์ และสวิตช์ข้อผิดพลาด', zone3: 'หลักฐาน',
       repLabel: 'สิ่งที่โน้ตบุ๊กรายงาน', todayLabel: 'ใช้งานจริง · ม.ค. 2026', nextLabel: 'เดือนถัดไป · ก.พ. 2026',
       busy: 'กำลังเทรนใหม่…',
-      nextLocked: 'คู่แข่งเปิดแพ็กเกจ 5G ราคาถูก และรายได้ครัวเรือนลดลง ก่อนดูผล ให้ทายก่อนว่าโมเดลนี้จะได้คะแนนเท่าไร',
+      nextLocked: 'สถานการณ์: คู่แข่งเปิดแพ็กเกจ 5G ราคาถูก และรายได้ครัวเรือนลดลง',
+      nextQuestion: 'คำถาม: ถ้าใช้โมเดลนี้ต่อในเดือน ก.พ. ผลจะดีเท่าเดือน ม.ค. ไหม?',
+      guessToggle: 'อยากทายก่อน? ใส่ตัวเลขที่คาด (ไม่บังคับ)',
+      nextRef: (pr, rc) => `อ้างอิงเดือน ม.ค.: PR-AUC ${pr} · recall ${rc}`,
       release: 'เปิดข้อมูล ก.พ.', relock: 'ซ่อนข้อมูล ก.พ. อีกครั้ง',
       thMetric: 'ตัวชี้วัด', thRep: 'โน้ตบุ๊ก (test set)', thJan: 'ม.ค. 2026', thFeb: 'ก.พ. 2026', thBase: 'Baseline “ไม่มีใครย้าย”',
       lgFlaw: 'มีข้อผิดพลาด', lgFixed: 'แก้แล้ว', lgLeak: 'ข้อมูลรั่ว (leakage)',
@@ -962,7 +979,10 @@ if (typeof module !== 'undefined') module.exports = Engine;
       zone2: 'Pipeline and flaw switches', zone3: 'Evidence',
       repLabel: 'What the notebook reports', todayLabel: 'Real deployment · Jan 2026', nextLabel: 'Next month · Feb 2026',
       busy: 'Retraining…',
-      nextLocked: 'A rival operator launches a cheap 5G plan and incomes fall. Before you look, predict how this model will score.',
+      nextLocked: 'Scenario: a rival operator launches a cheap 5G plan and household incomes fall.',
+      nextQuestion: 'Question: if we keep using this model in February, will it do as well as in January?',
+      guessToggle: 'Want to guess first? Enter your estimate (optional)',
+      nextRef: (pr, rc) => `January for reference: PR-AUC ${pr} · recall ${rc}`,
       release: 'Release Feb data', relock: 'Hide Feb data again',
       thMetric: 'Metric', thRep: 'Notebook (test)', thJan: 'Jan 2026', thFeb: 'Feb 2026', thBase: 'Always-"stays" baseline',
       lgFlaw: 'flaw present', lgFixed: 'fixed', lgLeak: 'information leaking',
@@ -1145,8 +1165,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
         look: 'จุดเลื่อนไปอยู่ใต้เส้นทแยง และ log loss สูงขึ้น ทั้งที่ PR-AUC แทบไม่เปลี่ยน',
         why: 'ถ้าจะใช้ความน่าจะเป็นไปคำนวณต้นทุน ค่าต้องตรงความจริง ไม่ใช่แค่จัดอันดับถูก (Lab 3)' },
       { t: 'ขั้น 9 · ทายผลเดือนหน้าก่อนเฉลย',
-        do: 'ตอนนี้ทุกข้อผิดพลาดถูกแก้แล้ว อ่านคะแนน ม.ค. 2026 แล้ว<b>พิมพ์ PR-AUC และ recall ที่คาดว่าจะได้ในเดือน ก.พ.</b> ในช่อง ① ด้านขวา จากนั้นกด “เปิดข้อมูล ก.พ.”',
-        look: 'คู่แข่งเปิดแพ็กเกจใหม่ อัตราการย้ายเพิ่มเกือบเท่าตัว recall ลดลง ชิปจะบอกว่าคุณทายคลาดไม่เกิน ±0.10 หรือมั่นใจเกินไป',
+        do: 'ตอนนี้ทุกข้อผิดพลาดถูกแก้แล้ว ดูช่อง ① ด้านขวา (ก.พ. 2026): อ่านค่าอ้างอิงของเดือน ม.ค. แล้วคิดว่าเดือน ก.พ. จะดีขึ้นหรือแย่ลง ถ้าอยากทายเป็นตัวเลข กด “อยากทายก่อน?” จากนั้นกด <b>“เปิดข้อมูล ก.พ.”</b>',
+        look: 'กล่อง “คำตอบ” จะเทียบ ม.ค. → ก.พ. ทีละตัวชี้วัด (▼ = แย่ลง) พร้อมเหตุผลว่าทำไมเปลี่ยน ถ้าทายตัวเลขไว้ จะบอกว่าคลาดไม่เกิน ±0.10 หรือมั่นใจเกินไป',
         why: 'การประเมินที่ดีคือรู้ขีดจำกัดของโมเดล ทีมที่ทาย 0.18 แล้วได้ 0.17 ดีกว่าทีมที่ทาย 0.90 แล้วได้ 0.17' },
       { t: 'ขั้น 10 · เฝ้าระวังหลังใช้งาน (drift)',
         do: 'ดูแท็บ ③ <b>Drift</b> (เลือก ก.พ. 2026 ไว้แล้ว) และอ่านตาราง “กฎการเฝ้าระวัง”',
@@ -1199,8 +1219,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
         look: 'The dots move below the diagonal and log loss rises, while PR-AUC barely changes.',
         why: 'If probabilities feed a cost calculation they must match reality, not just rank customers correctly (Lab 3).' },
       { t: 'Step 9 · Predict next month before the reveal',
-        do: 'Every flaw is now fixed. Read the January 2026 score, then <b>type the PR-AUC and recall you expect for February</b> in the right-hand box of ①, and press "Release Feb data".',
-        look: 'A rival launches a new plan, the churn rate almost doubles and recall falls. The chip tells you whether you were within ±0.10 or overconfident.',
+        do: 'Every flaw is now fixed. Look at the right-hand box of ① (Feb 2026): read the January reference numbers and decide whether February will be better or worse. To guess numbers, open "Want to guess first?". Then press <b>"Release Feb data"</b>.',
+        look: 'The Answer box compares January → February for each metric (▼ = worse) and explains why it changed. If you entered a guess, it says whether you were within ±0.10 or overconfident.',
         why: 'Good evaluation means knowing the model’s limits. A team that predicts 0.18 and gets 0.17 beats one that predicts 0.90 and gets 0.17.' },
       { t: 'Step 10 · Monitoring after deployment (drift)',
         do: 'Look at ③ <b>Drift</b> (Feb 2026 is selected) and read the monitoring rules.',
@@ -1341,22 +1361,41 @@ if (typeof module !== 'undefined') module.exports = Engine;
       ? (m.today.recall < 0.05 ? `<span class="chip bad">${t('noCatch')}</span>` : '')
       : gapChip(m.rep.prauc, m.today.prauc);
     $('next-locked').hidden = state.released; $('next-open').hidden = !state.released;
+    $('next-ref').textContent = t('nextRef', f3(m.today.prauc), pct(m.today.recall));
     if (state.released) {
       $('next-big').innerHTML = f3(m.next.prauc) + '<span class="unit">PR-AUC</span>';
-      $('next-sub').textContent = t('nextSub', pct(m.next.rate), pct(m.today.rate), pct(m.next.recall), baht(m.next.costPer1000));
-      const p = parseFloat($('pred-prauc').value);
-      let chip = '';
+      const arrow = (a, b, fmt, higherIsBetter = true) => {
+        const d = b - a, good = higherIsBetter ? d >= 0 : d <= 0;
+        return `<span class="${Math.abs(d) < 1e-9 ? '' : good ? 'up' : 'down'}">${fmt(a)} → ${fmt(b)} ${d > 0 ? '▲' : d < 0 ? '▼' : '='}</span>`;
+      };
+      const rows = [
+        ['PR-AUC', arrow(m.today.prauc, m.next.prauc, f3)],
+        ['Recall', arrow(m.today.recall, m.next.recall, pct)],
+        [L('อัตราการย้ายค่าย', 'Churn rate'), `${pct(m.today.rate)} → ${pct(m.next.rate)}`],
+        [L('ต้นทุน / 1,000 คน', 'Cost / 1,000'), arrow(m.today.costPer1000, m.next.costPer1000, baht, false)],
+      ];
+      let guess = '';
+      const p = parseFloat($('pred-prauc').value), pr = parseFloat($('pred-recall').value);
       if (!isNaN(p)) {
         const err = p - m.next.prauc;
-        chip = Math.abs(err) <= 0.1 ? `<span class="chip good">${t('predOk', f3(p))}</span>`
-          : `<span class="chip ${err > 0 ? 'bad' : 'warn'}">${err > 0 ? t('predOver', f3(p), f3(Math.abs(err))) : t('predUnder', f3(p), f3(Math.abs(err)))}</span>`;
+        guess += Math.abs(err) <= 0.1 ? `<span class="chip good">${t('predOk', f3(p))}</span> `
+          : `<span class="chip ${err > 0 ? 'bad' : 'warn'}">${err > 0 ? t('predOver', f3(p), f3(Math.abs(err))) : t('predUnder', f3(p), f3(Math.abs(err)))}</span> `;
       }
-      const pr = parseFloat($('pred-recall').value);
       if (!isNaN(pr)) {
         const e2 = pr / 100 - m.next.recall;
-        chip += ` <span class="chip ${Math.abs(e2) <= 0.1 ? 'good' : e2 > 0 ? 'bad' : 'warn'}">${Math.abs(e2) <= 0.1 ? t('recOk', pr) : t('recOff', pr, Math.round(Math.abs(e2) * 100))}</span>`;
+        guess += `<span class="chip ${Math.abs(e2) <= 0.1 ? 'good' : e2 > 0 ? 'bad' : 'warn'}">${Math.abs(e2) <= 0.1 ? t('recOk', pr) : t('recOff', pr, Math.round(Math.abs(e2) * 100))}</span>`;
       }
-      $('next-chip').innerHTML = chip || `<span class="chip neutral">${t('noPred')}</span>`;
+      const worse = m.next.recall < m.today.recall - 0.02;
+      $('next-ans').innerHTML = `
+        <span class="eyebrow">${L('คำตอบ: ม.ค. → ก.พ.', 'Answer: Jan → Feb')}</span>
+        <div class="rowc">${rows.map(([k, v]) => `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}</div>
+        ${guess ? `<div>${guess}</div>` : ''}
+        <div class="why">${L(
+          `<b>${worse ? 'ทำไมแย่ลง' : 'ทำไมตัวเลขเปลี่ยน'}:</b> ลูกค้าย้ายค่ายเพิ่มจาก ${pct(m.today.rate)} เป็น ${pct(m.next.rate)} ราว 1 ใน 4 ใช้แพ็กเกจ 5G Unlimited ที่โมเดลไม่เคยเห็น และรายได้ลดลง ความสัมพันธ์ที่โมเดลเรียนจากปี 2022–2024 จึงใช้ได้น้อยลง (PR-AUC อาจไม่ลดตามเพราะอัตราการย้ายสูงขึ้น ให้ดู recall และต้นทุนประกอบ) <button class="linkbtn" id="to-drift">ดูหลักฐานในแท็บ Drift</button>`,
+          `<b>${worse ? 'Why it got worse' : 'Why the numbers moved'}:</b> churn rose from ${pct(m.today.rate)} to ${pct(m.next.rate)}, about 1 in 4 customers use a 5G Unlimited plan the model has never seen, and incomes fell, so what the model learned from 2022–2024 fits less well. (PR-AUC can hold up simply because churn is more common; check recall and cost too.) <button class="linkbtn" id="to-drift">See the evidence in the Drift tab</button>`)}</div>
+        <p class="lesson">${L('บทเรียน: คะแนนจากข้อมูลเก่า ไม่รับประกันผลในอนาคต ต้องเฝ้าระวัง (monitoring) และเทรนใหม่เมื่อข้อมูลเปลี่ยน (Lab 6)', 'Lesson: a score from past data does not guarantee future performance. Monitor the model and retrain when the data changes (Lab 6).')}</p>`;
+      const td = $('to-drift');
+      if (td) td.addEventListener('click', () => { state.tab = 'drift'; state.driftWhich = 'next'; renderTabs(); renderTab(); $('ev-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     }
     const names = t('rows');
     const fns = [
