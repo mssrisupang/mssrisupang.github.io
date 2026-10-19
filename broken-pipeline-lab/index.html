@@ -148,6 +148,9 @@ table.cmp td .hint { font-family: var(--f-body); color: var(--ink-3); font-size:
 .panel-body { padding: 14px 18px 18px; }
 .diagram { overflow-x: auto; }
 .diagram svg { display: block; min-width: 720px; width: 100%; height: auto; }
+.diagram { overflow: visible !important; min-width: 0; }
+.panel-body > *, .tabpanel > *, .eda-body > * { min-width: 0; }
+.chart { min-width: 0; }
 .diagram text { font-family: var(--f-body); }
 .legend-line { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); }
 .legend-line span { display: inline-flex; align-items: center; gap: 6px; }
@@ -195,6 +198,12 @@ table.cmp td .hint { font-family: var(--f-body); color: var(--ink-3); font-size:
 .tabpanel { padding: 16px 18px 18px; display: grid; gap: 12px; }
 .chart { position: relative; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.zoombar { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-bottom: 4px; }
+.zoombar button { width: 28px; height: 26px; border: 1px solid var(--rule-strong); background: var(--surface); border-radius: 6px; cursor: pointer; font-size: 15px; line-height: 1; color: var(--ink-2); display: inline-grid; place-items: center; }
+.zoombar button:hover { border-color: var(--ink-3); color: var(--ink); }
+.zoombar span { font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); min-width: 40px; text-align: center; }
+.zscroll { overflow: auto; width: 100%; max-width: 100%; }
+.zscroll svg { max-width: none; }
 .chart text { font-family: var(--f-mono); font-size: 11px; fill: var(--ink-3); }
 .chart text.axt { font-family: var(--f-body); font-size: 12px; fill: var(--ink-2); }
 .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--surface); font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 5; line-height: 1.4; }
@@ -1447,6 +1456,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       else if (i > 0) svg += `<circle cx="${x + W - 10}" cy="${Y - 9}" r="4" fill="${green}"/>`;
     });
     $('diagram').innerHTML = svg + '</svg>';
+    attachZoom($('diagram'), 'diagram', 720);
   }
 
   // ================= flaw cards =================
@@ -1545,6 +1555,38 @@ if (typeof module !== 'undefined') module.exports = Engine;
     $('model-lr').setAttribute('aria-pressed', state.model === 'lr'); $('model-knn').setAttribute('aria-pressed', state.model === 'knn');
   }
 
+
+  // ================= zoom (+ / −) for the diagram and every chart =================
+  const zoomState = {};
+  function attachZoom(el, key, baseMin) {
+    if (!el) return;
+    const svg = el.querySelector(':scope > svg') || el.querySelector('svg');
+    if (!svg) return;
+    let wrap = svg.parentElement.classList.contains('zscroll') ? svg.parentElement : null;
+    if (!wrap) { wrap = document.createElement('div'); wrap.className = 'zscroll'; svg.before(wrap); wrap.append(svg); }
+    let bar = el.querySelector(':scope > .zoombar');
+    if (!bar) {
+      bar = document.createElement('div'); bar.className = 'zoombar';
+      bar.innerHTML = `<button type="button" data-z="-" aria-label="${L('ย่อ', 'Zoom out')}" title="${L('ย่อ', 'Zoom out')}">−</button><span></span><button type="button" data-z="+" aria-label="${L('ขยาย', 'Zoom in')}" title="${L('ขยาย', 'Zoom in')}">+</button><button type="button" data-z="0" aria-label="${L('ขนาดเดิม', 'Reset zoom')}" title="${L('ขนาดเดิม', 'Reset zoom')}">⟲</button>`;
+      el.prepend(bar);
+      bar.addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        let s = zoomState[key] || 1;
+        s = b.dataset.z === '+' ? Math.min(3, s + 0.25) : b.dataset.z === '-' ? Math.max(0.5, s - 0.25) : 1;
+        zoomState[key] = s; apply();
+      });
+    }
+    function apply() {
+      const s = zoomState[key] || 1;
+      svg.style.width = (s * 100) + '%';
+      if (baseMin) svg.style.minWidth = (baseMin * s) + 'px';
+      bar.querySelector('span').textContent = Math.round(s * 100) + '%';
+      bar.querySelector('[data-z="-"]').disabled = s <= 0.5;
+      bar.querySelector('[data-z="+"]').disabled = s >= 3;
+    }
+    apply();
+  }
+
   // ================= charts =================
   function axes(x0, x1, y0, y1, w, h, pad, xt, yt, xfmt, yfmt, titles) {
     const sx = (v) => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r);
@@ -1572,7 +1614,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       const cx = sx(near[0].p[0]);
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.display = '';
       tip.hidden = false; tip.innerHTML = `${xfmt(near[0].p[0])}<br>` + near.map((o) => `<span style="color:${o.s.color}">■</span> ${o.s.name}: ${fmtRow(o.p[1])}`).join('<br>');
-      tip.style.left = (cx / w * rect.width) + 'px'; tip.style.top = '24px';
+      tip.style.left = (cx / w * rect.width + rect.left - container.getBoundingClientRect().left) + 'px'; tip.style.top = '36px';
     }
     function leave() { tip.hidden = true; cross.style.display = 'none'; }
     svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', leave);
@@ -1738,6 +1780,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     let out = x.fn(M());
     if (typeof out === 'string') out = { html: out };
     const el = $('tabpanel'); el.innerHTML = out.html; if (out.after) out.after(el);
+    el.querySelectorAll('.chart').forEach((c, i) => attachZoom(c, state.tab + i));
     $('ev-sub').textContent = state.model === 'knn' ? t('evKNN') : t('evLR');
   }
   function render() {
@@ -1874,6 +1917,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const dictBlock = `<details class="gloss dict-box" open><summary><b>${L('พจนานุกรมข้อมูล: ความหมายของแต่ละคอลัมน์', 'Data dictionary: what each column means')}</b></summary><div style="padding:0 10px 10px;display:grid;gap:8px">${dictHtml(false)}</div></details>`;
     body.innerHTML = kpiHtml + dictBlock + `<div class="eda-grid">${quarterHtml}${catHtml}</div>` + statHtml + histHtml;
     bindTips(body);
+    body.querySelectorAll('.chart').forEach((c, i) => attachZoom(c, 'eda' + i));
     $('eda-feat').addEventListener('change', (e) => { state.edaFeat = e.target.value; renderEDA(); });
   }
   $('eda-all').addEventListener('click', () => { state.edaRange = 48; renderEDA(); });
