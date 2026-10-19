@@ -229,6 +229,9 @@ table.stats td { font-family: var(--f-mono); }
 .eda-q { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
 .eda-hist-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .eda-hist-head select { padding: 5px 8px; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--surface); font-family: var(--f-mono); font-size: 13px; }
+table.stats.dict td { vertical-align: top; font-family: var(--f-body); }
+table.stats.dict td.mono { font-family: var(--f-mono); }
+.dock table.stats { min-width: 0; font-size: 12.5px; }
 @media (max-width: 900px) { .eda-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* highlight for the guide */
@@ -1037,6 +1040,40 @@ if (typeof module !== 'undefined') module.exports = Engine;
       ['PSI / drift', 'How much an input’s distribution has moved since training. Above 0.2 deserves an alert.'],
     ],
   };
+
+  // Data dictionary: [column, type, range/unit, level, known at decision time?, meaning TH, meaning EN]
+  const DICT = [
+    ['account_id', 'ID', '0–19,999', 'acct', 'yes', 'รหัสบัญชีลูกค้า 1 บัญชีมีได้ 1–5 เบอร์ (แพ็กเกจครอบครัว) ไม่ใช้เป็นอินพุต แต่ใช้แบ่งข้อมูลแบบ group', 'Customer account ID. One account can hold 1–5 lines (family plan). Not an input, but used for group splits.'],
+    ['month', 'date', 'Jan 2022 – Dec 2025', 'acct', 'yes', 'เดือนที่ประเมินลูกค้า (วันที่ให้คะแนน) ใช้แบ่งข้อมูลตามเวลา ไม่ใช้เป็นอินพุต', 'Month the customer was scored. Used for the time split, not as an input.'],
+    ['churn (target)', '0/1', '≈4.5% = 1', 'acct', 'target', 'ตัวแปรเป้าหมาย: 1 = ลูกค้ายกเลิกบริการ/ย้ายค่ายหลังวันที่ประเมิน, 0 = ยังอยู่ ทุกเบอร์ในบัญชีเดียวกันมีค่าเดียวกัน', 'Target: 1 = the account cancelled after the scoring date, 0 = stayed. All lines of an account share the same value.'],
+    ['tenure_months', 'number', '0–206 months', 'acct', 'yes', 'อายุการเป็นลูกค้า (เดือน) นับจากวันสมัครถึงวันที่ประเมิน ลูกค้าใหม่ย้ายง่ายกว่า', 'Months since the customer joined. Newer customers leave more easily.'],
+    ['monthly_bill_thb', 'number', '฿150–4,700', 'acct', 'yes', 'ค่าบริการรายเดือนของทั้งบัญชี (บาท) ยิ่งช่วงหลัง ลูกค้ายิ่งอ่อนไหวต่อราคา', 'Monthly bill for the whole account (baht). Customers become more price-sensitive over time.'],
+    ['household_income_thb', 'number', '฿5,500–236,000', 'acct', 'yes', 'รายได้ครัวเรือนต่อเดือน (บาท) สเกลใหญ่กว่าคอลัมน์อื่นมาก ต้อง scale (F3)', 'Monthly household income (baht). On a much larger scale than other columns, so it must be scaled (F3).'],
+    ['age', 'number', '18–80 years', 'acct', 'yes', 'อายุของเจ้าของบัญชี (ปี)', 'Age of the account holder (years).'],
+    ['data_usage_gb', 'number', '2–210 GB', 'line', 'yes', 'ปริมาณอินเทอร์เน็ตที่ใช้ต่อเดือนของเบอร์นั้น (GB) ใช้มากมักผูกพันกับบริการมากกว่า', 'Monthly mobile data used on this line (GB). Heavy users tend to stay.'],
+    ['dropped_calls_pct', 'number', '0–4.6%', 'line', 'yes', 'สัดส่วนสายหลุดของเบอร์นั้น (%) สะท้อนคุณภาพสัญญาณ', 'Share of dropped calls on this line (%), a proxy for network quality.'],
+    ['device_age_months', 'number', '0–47 months', 'line', 'yes', 'อายุของเครื่องโทรศัพท์ (เดือน)', 'Age of the handset (months).'],
+    ['support_tickets_90d', 'count', '0–6', 'acct', 'yes', 'จำนวนครั้งที่ติดต่อศูนย์บริการใน 90 วันก่อนวันที่ประเมิน', 'Support contacts in the 90 days before the scoring date.'],
+    ['late_payments_6m', 'count', '0–6', 'acct', 'yes', 'จำนวนครั้งที่จ่ายค่าบริการช้าใน 6 เดือนก่อนวันที่ประเมิน', 'Late bill payments in the 6 months before the scoring date.'],
+    ['contract_month_to_month', '0/1', 'one-hot', 'acct', 'yes', '1 = ไม่มีสัญญา (รายเดือน) ย้ายได้ทันที จึงย้ายบ่อยที่สุด', '1 = no contract (month-to-month), free to leave at any time, so churns most.'],
+    ['contract_24_month', '0/1', 'one-hot', 'acct', 'yes', '1 = สัญญา 24 เดือน ถ้าทั้งสองคอลัมน์สัญญาเป็น 0 แปลว่าสัญญา 12 เดือน (หมวดอ้างอิง)', '1 = 24-month contract. If both contract columns are 0 the contract is 12 months (the reference category).'],
+    ['plan_fiber_bundle', '0/1', 'one-hot', 'acct', 'yes', '1 = แพ็กเกจรวมอินเทอร์เน็ตบ้าน (fiber)', '1 = bundle with home fiber internet.'],
+    ['plan_5g', '0/1', 'one-hot', 'acct', 'yes', '1 = แพ็กเกจ 5G ถ้าทั้งสองคอลัมน์แพ็กเกจเป็น 0 แปลว่าแพ็กเกจ 4G (หมวดอ้างอิง) แพ็กเกจ 5G Unlimited ที่เพิ่งออกในเดือน ก.พ. ไม่มีคอลัมน์ของตัวเอง', '1 = 5G plan. If both plan columns are 0 the plan is 4G (reference). The new 5G Unlimited plan in February has no column of its own.'],
+    ['survey_q1 … survey_q30', 'number', '≈ −4 to 4 (z-score)', 'acct', 'yes', 'คะแนนแบบสอบถามความพึงพอใจ 30 ข้อ ปรับเป็นค่ามาตรฐานแล้ว ในข้อมูลชุดนี้เป็น noise ล้วน ใช้ดูว่า SelectKBest เลือกคอลัมน์ไร้ประโยชน์โดยบังเอิญได้อย่างไร (F1)', '30 satisfaction-survey scores, standardised. In this data they are pure noise, there to show SelectKBest picking useless columns by chance (F1).'],
+    ['retention_team_calls', 'count', '0–6', 'acct', 'no', 'จำนวนครั้งที่ทีมรักษาฐานลูกค้าโทรหา ซึ่งเกิดขึ้น <b>หลัง</b> ลูกค้าแจ้งขอยกเลิกแล้ว ณ วันที่ต้องทำนายจึงเป็น 0 เสมอ = คอลัมน์รั่ว (F2)', 'Calls from the retention team, which only happen <b>after</b> a customer asks to cancel. Always 0 when the prediction is made, so it is a leak (F2).'],
+  ];
+  function dictHtml(compact) {
+    const head = lang === 'th'
+      ? ['คอลัมน์', 'ชนิด', 'ช่วงค่า / หน่วย', 'ระดับ', 'รู้ค่าตอนทำนาย?', 'ความหมาย']
+      : ['Column', 'Type', 'Range / unit', 'Level', 'Known at prediction?', 'Meaning'];
+    const lvl = { acct: L('บัญชี', 'account'), line: L('เบอร์', 'line') };
+    const known = { yes: L('รู้', 'yes'), no: L('ไม่รู้ (รั่ว)', 'no (leak)'), target: L('เป้าหมาย', 'target') };
+    const rows = DICT.map(([c, ty, rg, lv, kn, th, en]) => `<tr${kn === 'no' ? ' style="color:var(--flaw)"' : ''}><td class="mono">${c}</td>${compact ? '' : `<td>${ty}</td><td>${rg}</td><td>${lvl[lv]}</td>`}<td>${known[kn]}</td><td style="white-space:normal;text-align:left;min-width:${compact ? 180 : 260}px">${lang === 'th' ? th : en}</td></tr>`).join('');
+    const hd = compact ? [head[0], head[4], head[5]] : head;
+    return `<div class="stats-wrap"><table class="stats dict"><thead><tr>${hd.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="small muted">${L('“ระดับ” บอกว่าค่าเป็นของทั้งบัญชี (ทุกเบอร์ในบัญชีเดียวกันมีค่าเท่ากัน) หรือของแต่ละเบอร์ 1 แถวในข้อมูล = 1 เบอร์ ณ เดือนที่ประเมิน', '"Level" says whether a value belongs to the whole account (identical on every line of that account) or to one line. One row of data = one line on its scoring month.')}</p>`;
+  }
+
   const FIDS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
   const CONSULTANT = { F1: true, F2: true, F3: true, F4: true, F5: true, F6: true, F7: true, F8: true, F9: false };
   const AUDITOR = Object.fromEntries(FIDS.map((f) => [f, false]));
@@ -1065,7 +1102,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
         look: 'หน้าจอมี 4 ส่วนตามหมายเลข: <b>⓪ สำรวจข้อมูล</b> ภาพรวมของข้อมูลก่อนสร้างโมเดล <b>① ผลคะแนน</b> เทียบ “สิ่งที่โน้ตบุ๊กรายงาน” กับ “ผลจริงตอนใช้งาน” <b>② ไปป์ไลน์</b> และสวิตช์ F1–F9 (แดง = มีข้อผิดพลาด, เขียว = แก้แล้ว) <b>③ หลักฐาน</b> แท็บกราฟที่ใช้พิสูจน์ว่าข้อผิดพลาดมีจริง',
         why: 'คู่มือจะพาไปทีละข้อผิดพลาด แต่ละขั้นจะตั้งสวิตช์ให้พร้อมเริ่ม ให้คุณลองกดเองก่อน ถ้าติด กด “ทำให้ดู” ตัวเลขที่ซื่อสัตย์สำคัญกว่าตัวเลขที่สูง' },
       { t: 'ขั้น 0 · สำรวจข้อมูลก่อน (EDA)',
-        do: 'ดูโซน <b>⓪ สำรวจข้อมูล</b>: ตัวเลขสรุป กราฟอัตราการย้ายรายไตรมาส ตารางสถิติของแต่ละคอลัมน์ แล้วลองเลือกคอลัมน์ต่าง ๆ ในกราฟ histogram ด้านล่างสุด',
+        do: 'ดูโซน <b>⓪ สำรวจข้อมูล</b>: อ่าน <b>พจนานุกรมข้อมูล</b> ก่อนว่าแต่ละคอลัมน์หมายถึงอะไร แล้วดูตัวเลขสรุป กราฟอัตราการย้ายรายไตรมาส ตารางสถิติของแต่ละคอลัมน์ แล้วลองเลือกคอลัมน์ต่าง ๆ ในกราฟ histogram ด้านล่างสุด',
         look: 'อัตราการย้ายค่ายแค่ราว 4% (ข้อมูลไม่สมดุล) หนึ่งบัญชีมีได้หลายเบอร์ คอลัมน์เงินบาทมีสเกลใหญ่กว่าคอลัมน์อื่นหลายพันเท่า และมีคอลัมน์หนึ่งที่ “ความต่าง (SD)” ระหว่างกลุ่มย้ายกับไม่ย้ายสูงผิดปกติ ลองหาดู',
         why: 'ทุกข้อผิดพลาดที่จะเจอมีเบาะแสในข้อมูลตั้งแต่แรก: ข้อมูลไม่สมดุล → F4, F5 · สเกลต่างกัน → F3 · ข้อมูลเรียงตามเวลา → F6 · หลายเบอร์ต่อบัญชี → F8 · คอลัมน์ที่ดีเกินจริง → F2 ในงานจริงให้สำรวจเฉพาะข้อมูล train (ปุ่ม “เฉพาะ train”) เพื่อไม่ให้แอบเห็น test set' },
       { t: 'ขั้น 1 · accuracy 95.6% ดีจริงไหม (F4)',
@@ -1119,7 +1156,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
         look: 'The screen has four numbered zones. <b>⓪ Explore</b> summarises the data before any modelling. <b>① Scores</b> compares what the notebook reports with real deployment. <b>② Pipeline</b> holds the F1–F9 switches (red = flaw present, green = fixed). <b>③ Evidence</b> has the charts that prove each flaw is real.',
         why: 'The guide takes one flaw per step and sets the switches up for you at the start of each step. Try the action yourself first; press "Do it for me" if you get stuck. An honest number matters more than a high one.' },
       { t: 'Step 0 · Explore the data first (EDA)',
-        do: 'Look at <b>⓪ Explore</b>: the summary numbers, the churn rate by quarter, the statistics table, and try different columns in the histogram at the bottom.',
+        do: 'Look at <b>⓪ Explore</b>: read the <b>data dictionary</b> first to learn what each column means, then the summary numbers, the churn rate by quarter, the statistics table, and try different columns in the histogram at the bottom.',
         look: 'Only about 4% churn (imbalanced). One account can have several lines. The baht columns are thousands of times larger than the others. And one column has an unusually large "difference (SD)" between churners and stayers. Find it.',
         why: 'Every flaw you will meet leaves a clue in the data: imbalance → F4, F5 · different scales → F3 · time order → F6 · several lines per account → F8 · a column that is too good → F2. In a real project, explore the training data only ("Training only" button) so you never peek at the test set.' },
       { t: 'Step 1 · Is 95.6% accuracy good? (F4)',
@@ -1767,7 +1804,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
       <div class="chart">${hsvg}<div class="tip" hidden></div></div>
       <p class="small muted">${L('แต่ละกลุ่มคิดเป็นเปอร์เซ็นต์ของกลุ่มตัวเอง จึงเทียบรูปร่างกันได้แม้กลุ่มย้ายจะมีแค่ราว 4% ถ้าสองสีซ้อนกันเกือบหมด คอลัมน์นั้นช่วยทำนายได้น้อย', 'Each group is shown as a percentage of itself, so the shapes compare fairly even though churners are only about 4%. If the two colours overlap almost completely, the column helps little.')}</p></div>`;
 
-    body.innerHTML = kpiHtml + `<div class="eda-grid">${quarterHtml}${catHtml}</div>` + statHtml + histHtml;
+    const dictBlock = `<details class="gloss dict-box" open><summary><b>${L('พจนานุกรมข้อมูล: ความหมายของแต่ละคอลัมน์', 'Data dictionary: what each column means')}</b></summary><div style="padding:0 10px 10px;display:grid;gap:8px">${dictHtml(false)}</div></details>`;
+    body.innerHTML = kpiHtml + dictBlock + `<div class="eda-grid">${quarterHtml}${catHtml}</div>` + statHtml + histHtml;
     bindTips(body);
     $('eda-feat').addEventListener('change', (e) => { state.edaFeat = e.target.value; renderEDA(); });
   }
@@ -1799,7 +1837,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
     $('dock-step').textContent = t('stepOf', i + 1, n);
     $('dock-prog').innerHTML = STEPS.map((_, k) => `<button class="${k < i ? 'done' : k === i ? 'cur' : ''}" data-k="${k}" aria-label="${k + 1}"></button>`).join('');
     $('dock-prog').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => goStep(+b.dataset.k)));
-    const gloss = i === 0 ? `<details class="gloss"><summary>${t('glossTitle')}</summary><dl>${GLOSS[lang].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></details>` : '';
+    const gloss = (i === 0 ? `<details class="gloss"><summary>${t('glossTitle')}</summary><dl>${GLOSS[lang].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></details>` : '')
+      + (i <= 1 ? `<details class="gloss"><summary>${L('ความหมายของคอลัมน์ในข้อมูล', 'What each data column means')}</summary><div style="padding:0 8px 8px">${dictHtml(true)}</div></details>` : '');
     $('dock-body').innerHTML = `<h3>${g.t}</h3>
       <div class="gsec do"><span class="k">${t('kDo')}</span><div>${g.do.startsWith('<ul') ? g.do : `<p>${g.do}</p>`}</div></div>
       <div class="gsec look"><span class="k">${t('kLook')}</span><p>${g.look}</p></div>
