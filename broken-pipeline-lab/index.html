@@ -468,7 +468,7 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
   </div>
 
   <section class="panel" id="sum-panel" aria-labelledby="sum-h">
-    <div class="panel-head"><div class="zone-head"><span class="zone">4</span><h2 id="sum-h" data-i="zone4"></h2></div><span class="small muted" data-i="zone4sub"></span></div>
+    <div class="panel-head"><div class="zone-head"><span class="zone">4</span><h2 id="sum-h" data-i="zone4"></h2></div><div class="controls"><span class="small muted" data-i="zone4sub"></span><button class="btn" id="sum-toggle" aria-controls="sum-body"></button></div></div>
     <div class="panel-body sum-body" id="sum-body"></div>
   </section>
 
@@ -995,7 +995,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       sbScores: (a, b) => `โน้ตบุ๊ก ${a} · ม.ค. ${b}`,
       zone1: 'ผลคะแนน: สิ่งที่รายงาน เทียบกับความจริง', zone1sub: 'เป้าหมายคือให้ช่องซ้ายใกล้ช่องกลางที่สุด ไม่ใช่ให้ช่องซ้ายสูงที่สุด',
       zone0: 'สำรวจข้อมูลก่อนวิเคราะห์ (EDA)', edaAll: 'ทั้งหมด 2022–2025', edaTrain: 'เฉพาะ train 2022–2024', edaHide: 'ซ่อนส่วนนี้ ▴', edaShow: 'แสดงส่วนสำรวจข้อมูล ▾',
-      zone4: 'สรุปและอภิปรายผล', zone4sub: 'อัปเดตตามสวิตช์และโมเดลที่เลือกอยู่ตอนนี้',
+      zone4: 'สรุปและอภิปรายผล', zone4sub: 'อัปเดตตามสวิตช์และโมเดลที่เลือกอยู่ตอนนี้', sumHide: 'ซ่อนส่วนนี้ ▴', sumShow: 'แสดงสรุปและอภิปรายผล ▾',
       zone2: 'ไปป์ไลน์ และสวิตช์ข้อผิดพลาด', zone3: 'หลักฐาน',
       repLabel: 'สิ่งที่โน้ตบุ๊กรายงาน', todayLabel: 'ใช้งานจริง · ม.ค. 2026', nextLabel: 'เดือนถัดไป · ก.พ. 2026',
       busy: 'กำลังเทรนใหม่…',
@@ -1050,7 +1050,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       sbScores: (a, b) => `Notebook ${a} · Jan ${b}`,
       zone1: 'Scores: what is reported vs. what is real', zone1sub: 'The goal is to make the left column match the middle one, not to make the left one high.',
       zone0: 'Explore the data first (EDA)', edaAll: 'All 2022–2025', edaTrain: 'Training only 2022–2024', edaHide: 'Hide this section ▴', edaShow: 'Show data exploration ▾',
-      zone4: 'Discussion and conclusion', zone4sub: 'Updates with the switches and model you have selected',
+      zone4: 'Discussion and conclusion', zone4sub: 'Updates with the switches and model you have selected', sumHide: 'Hide this section ▴', sumShow: 'Show discussion and conclusion ▾',
       zone2: 'Pipeline and flaw switches', zone3: 'Evidence',
       repLabel: 'What the notebook reports', todayLabel: 'Real deployment · Jan 2026', nextLabel: 'Next month · Feb 2026',
       busy: 'Retraining…',
@@ -1673,7 +1673,15 @@ if (typeof module !== 'undefined') module.exports = Engine;
 
 
   // ================= zone 4: discussion & conclusion =================
+  state.sumOpen = true;
+  try { if (localStorage.getItem('bpl-sum-open') === '0') state.sumOpen = false; } catch (e) {}
+  function syncSumToggle() {
+    $('sum-body').hidden = !state.sumOpen;
+    $('sum-toggle').textContent = state.sumOpen ? t('sumHide') : t('sumShow');
+    $('sum-toggle').setAttribute('aria-expanded', state.sumOpen);
+  }
   function renderSummary(m) {
+    syncSumToggle();
     const F = state.flaws, on = FIDS.filter((f) => F[f]);
     const rep_ = m.rep, jan = m.today, base = m.todayB;
     const gap = rep_.prauc - jan.prauc;
@@ -2155,6 +2163,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   function goStep(k) {
     state.step = Math.max(0, Math.min(STEPS.length - 1, k));
     if (STEPS[state.step].eda && !state.edaOpen) { state.edaOpen = true; renderEDA(); }
+    if (STEPS[state.step].hl.includes('sum-panel') && !state.sumOpen) { state.sumOpen = true; syncSumToggle(); }
     saveGuide();
     applyState(STEPS[state.step].setup);
     renderGuide(true);
@@ -2176,6 +2185,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   $('model-knn').addEventListener('click', () => { state.model = 'knn'; syncPresets(); rerun(); });
   $('predict-first').addEventListener('change', (e) => { state.predictFirst = e.target.checked; state.ask = null; renderAsk(); syncStatus(); });
   $('seed-info').addEventListener('click', () => { const h = $('seed-help'); h.hidden = !h.hidden; $('seed-info').setAttribute('aria-expanded', !h.hidden); });
+  $('sum-toggle').addEventListener('click', () => { state.sumOpen = !state.sumOpen; try { localStorage.setItem('bpl-sum-open', state.sumOpen ? '1' : '0'); } catch (e) {} syncSumToggle(); });
   $('sb-consultant').addEventListener('click', () => $('preset-consultant').click());
   $('sb-auditor').addEventListener('click', () => $('preset-auditor').click());
   $('sb-lr').addEventListener('click', () => $('model-lr').click());
@@ -2190,7 +2200,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const v = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 11)); e.target.value = v;
     state.seed = v; $('busy').hidden = false; await call({ type: 'build', seed: v }); rerun(); renderEDA();
   });
-  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); renderEDA(); };
+  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); renderEDA(); syncSumToggle(); };
   $('lang-th').addEventListener('click', () => setLang('th'));
   $('lang-en').addEventListener('click', () => setLang('en'));
 
