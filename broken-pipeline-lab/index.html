@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Broken Pipeline Lab: interactive CPE312 demo of ML pipeline flaws (leakage, splits, thresholds, drift).">
+<meta name="description" content="Broken ML Pipeline Lab: interactive CPE312 demo of ML pipeline flaws (leakage, splits, thresholds, drift).">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Broken Pipeline Lab</title>
+<title>Broken ML Pipeline Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -287,7 +287,7 @@ table.stats td { font-family: var(--f-mono); }
   <header class="top">
     <div class="title">
       <span class="eyebrow">CPE312 Data Science · Lecture 7 · ML models</span>
-      <h1>Broken Pipeline Lab <span class="muted" style="font-weight:500;font-size:.7em" data-i="subtitle"></span></h1>
+      <h1>Broken ML Pipeline Lab</h1>
       <p class="lede" data-i="lede"></p>
     </div>
     <div class="controls">
@@ -901,7 +901,6 @@ if (typeof module !== 'undefined') module.exports = Engine;
   const THM = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const I = {
     th: {
-      subtitle: 'ห้องทดลองไปป์ไลน์พัง',
       lede: 'ที่ปรึกษาคนหนึ่งสร้างโมเดลทำนายลูกค้าที่จะย้ายค่าย (churn) ให้บริษัทมือถือ แล้วบอกว่า “พร้อมใช้งานจริง” แต่ในโน้ตบุ๊กมีข้อผิดพลาดซ่อนอยู่ 9 จุด (F1–F9) คุณคือทีมตรวจสอบ: ปิดข้อผิดพลาดทีละจุด แล้วดูว่าคะแนนที่โน้ตบุ๊กรายงานต่างจากผลจริงกับลูกค้าใหม่แค่ไหน ถ้าเพิ่งเข้ามาครั้งแรก กด “คู่มือทีละขั้น”',
       openGuide: 'คู่มือทีละขั้น',
       presetBad: 'โน้ตบุ๊กของที่ปรึกษา', presetGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', predictFirst: 'ให้ทายก่อนเฉลย',
@@ -945,7 +944,6 @@ if (typeof module !== 'undefined') module.exports = Engine;
       tabs: { loss: 'Loss curve', pr: 'Precision–recall', cost: 'Threshold และต้นทุน', feat: 'ฟีเจอร์', calib: 'Calibration', drift: 'Drift' },
     },
     en: {
-      subtitle: '',
       lede: 'A consultant built a churn model for a mobile operator and says it is ready to deploy. Their notebook hides nine mistakes (F1–F9). You are the audit team: switch the mistakes off one at a time and watch how far the score the notebook reports is from how the model really does on new customers. First time here? Press "Step-by-step guide".',
       openGuide: 'Step-by-step guide',
       presetBad: "Consultant's notebook", presetGood: 'Audited pipeline', predictFirst: 'Predict before reveal',
