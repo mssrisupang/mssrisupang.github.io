@@ -94,6 +94,15 @@ header.top .lede { color: var(--ink-2); font-size: 15px; }
 .check { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
 .check input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
 
+/* sticky status bar (appears once the header scrolls away) */
+.statusbar { position: fixed; top: 0; left: 0; right: 0; z-index: 40; padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--rule); box-shadow: var(--shadow); transform: translateY(-110%); transition: transform .2s; }
+.statusbar.show { transform: none; }
+.statusbar .in { max-width: 1280px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.statusbar .name { font-family: var(--f-display); font-weight: 700; font-size: 15px; }
+.statusbar .btn, .statusbar .seg button { padding: 4px 9px; font-size: 12.5px; }
+.statusbar .scores { font-family: var(--f-mono); font-size: 12.5px; color: var(--ink-2); margin-left: auto; }
+.predict-help { flex-basis: 100%; font-size: 13px; color: var(--ink-2); background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; }
+
 /* zone numbers */
 .zone { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--surface); font-family: var(--f-mono); font-size: 13px; font-weight: 600; flex: none; }
 .zone-head { display: flex; align-items: center; gap: 10px; }
@@ -334,9 +343,22 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
         <button id="model-lr" aria-pressed="true">Logistic regression</button>
         <button id="model-knn" aria-pressed="false">k-NN</button>
       </div>
-      <label class="check"><input type="checkbox" id="predict-first"> <span data-i="predictFirst"></span></label>
+      <label class="check" data-i-title="predictTitle"><input type="checkbox" id="predict-first"> <span data-i="predictFirst"></span></label>
+      <p class="predict-help" id="predict-help" data-i="predictHelp" hidden></p>
     </div>
   </header>
+
+  <div class="statusbar" id="statusbar" aria-label="Current settings">
+    <div class="in">
+      <span class="name">Broken ML Pipeline Lab</span>
+      <span class="chip" id="sb-mode"></span>
+      <button class="btn preset-bad" id="sb-consultant" data-i="presetBad"></button>
+      <button class="btn preset-good" id="sb-auditor" data-i="presetGood"></button>
+      <div class="seg" role="group" aria-label="Model"><button id="sb-lr">Logistic regression</button><button id="sb-knn">k-NN</button></div>
+      <span class="chip neutral" id="sb-predict" hidden data-i="predictOn"></span>
+      <span class="scores" id="sb-scores"></span>
+    </div>
+  </div>
 
   <section class="panel" id="eda-panel" aria-labelledby="eda-h">
     <div class="panel-head">
@@ -414,7 +436,7 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
       </div>
     </section>
 
-    <section class="panel sticky" id="ev-panel" aria-labelledby="ev-h" style="position:sticky;top:calc(env(safe-area-inset-top, 0px) + 12px)">
+    <section class="panel sticky" id="ev-panel" aria-labelledby="ev-h" style="position:sticky;top:calc(env(safe-area-inset-top, 0px) + 64px)">
       <div class="panel-head"><div class="zone-head"><span class="zone">3</span><h2 id="ev-h" data-i="zone3"></h2></div><span class="small muted" id="ev-sub"></span></div>
       <div class="tabs" role="tablist" id="tabs"></div>
       <div class="tabpanel" id="tabpanel" role="tabpanel"></div>
@@ -936,9 +958,15 @@ if (typeof module !== 'undefined') module.exports = Engine;
     th: {
       lede: 'ที่ปรึกษาคนหนึ่งสร้างโมเดลทำนายลูกค้าที่จะย้ายค่าย (churn) ให้บริษัทมือถือ แล้วบอกว่า “พร้อมใช้งานจริง” แต่ในโน้ตบุ๊กมีข้อผิดพลาดซ่อนอยู่ 9 จุด (F1–F9) คุณคือทีมตรวจสอบ: ปิดข้อผิดพลาดทีละจุด แล้วดูว่าคะแนนที่โน้ตบุ๊กรายงานต่างจากผลจริงกับลูกค้าใหม่แค่ไหน ถ้าเพิ่งเข้ามาครั้งแรก กด “คู่มือทีละขั้น”',
       openGuide: 'คู่มือทีละขั้น',
-      presetBad: 'โน้ตบุ๊กของที่ปรึกษา', presetGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', predictFirst: 'ให้ทายก่อนเฉลย',
+      presetBad: 'โน้ตบุ๊กของที่ปรึกษา', presetGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', predictFirst: 'โหมดทายผล (ถามก่อนเฉลย)',
+      predictTitle: 'เมื่อเปิด ทุกครั้งที่กดสวิตช์ F1–F9 จะถามให้ทายก่อนว่าคะแนนจะขึ้นหรือลง',
+      predictHelp: '<b>โหมดทายผลเปิดอยู่:</b> เมื่อกดสวิตช์ F1–F9 สวิตช์จะยังไม่เปลี่ยนทันที แต่จะมีคำถามในการ์ดนั้นว่า “คะแนนที่โน้ตบุ๊กรายงานจะ สูงขึ้น / ลดลง / เท่าเดิม” ตอบแล้วโมเดลจึงเทรนใหม่และเฉลยว่าทายถูกไหม ใช้ฝึกคาดผลของแต่ละข้อผิดพลาดก่อนเห็นคำตอบ เหมาะกับการเล่นในห้องเรียน',
+      predictOn: 'โหมดทายผล: เปิด',
+      modeBad: 'โน้ตบุ๊กของที่ปรึกษา', modeGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', modeCustom: 'ปรับเอง',
+      modeChip: (m, n, N) => `${m} · ข้อผิดพลาด ${n}/${N}`,
+      sbScores: (a, b) => `โน้ตบุ๊ก ${a} · ม.ค. ${b}`,
       zone1: 'ผลคะแนน: สิ่งที่รายงาน เทียบกับความจริง', zone1sub: 'เป้าหมายคือให้ช่องซ้ายใกล้ช่องกลางที่สุด ไม่ใช่ให้ช่องซ้ายสูงที่สุด',
-      zone0: 'สำรวจข้อมูลก่อนวิเคราะห์ (EDA)', edaAll: 'ทั้งหมด 2022–2025', edaTrain: 'เฉพาะ train 2022–2024', edaHide: 'ซ่อน ▴', edaShow: 'แสดง ▾',
+      zone0: 'สำรวจข้อมูลก่อนวิเคราะห์ (EDA)', edaAll: 'ทั้งหมด 2022–2025', edaTrain: 'เฉพาะ train 2022–2024', edaHide: 'ซ่อนส่วนนี้ ▴', edaShow: 'แสดงส่วนสำรวจข้อมูล ▾',
       zone2: 'ไปป์ไลน์ และสวิตช์ข้อผิดพลาด', zone3: 'หลักฐาน',
       repLabel: 'สิ่งที่โน้ตบุ๊กรายงาน', todayLabel: 'ใช้งานจริง · ม.ค. 2026', nextLabel: 'เดือนถัดไป · ก.พ. 2026',
       busy: 'กำลังเทรนใหม่…',
@@ -982,9 +1010,15 @@ if (typeof module !== 'undefined') module.exports = Engine;
     en: {
       lede: 'A consultant built a churn model for a mobile operator and says it is ready to deploy. Their notebook hides nine mistakes (F1–F9). You are the audit team: switch the mistakes off one at a time and watch how far the score the notebook reports is from how the model really does on new customers. First time here? Press "Step-by-step guide".',
       openGuide: 'Step-by-step guide',
-      presetBad: "Consultant's notebook", presetGood: 'Audited pipeline', predictFirst: 'Predict before reveal',
+      presetBad: "Consultant's notebook", presetGood: 'Audited pipeline', predictFirst: 'Guess mode (predict before reveal)',
+      predictTitle: 'When on, every time you flip an F1–F9 switch you first guess whether the score will go up or down',
+      predictHelp: '<b>Guess mode is on:</b> flipping an F1–F9 switch does not apply it straight away. The card first asks whether the score the notebook reports will go up, go down or stay the same. After you answer, the model retrains and the card tells you whether you were right. Use it to practise predicting each flaw before seeing the result, for example as a class game.',
+      predictOn: 'Guess mode: on',
+      modeBad: "Consultant's notebook", modeGood: 'Audited pipeline', modeCustom: 'Custom',
+      modeChip: (m, n, N) => `${m} · ${n}/${N} flaws`,
+      sbScores: (a, b) => `Notebook ${a} · Jan ${b}`,
       zone1: 'Scores: what is reported vs. what is real', zone1sub: 'The goal is to make the left column match the middle one, not to make the left one high.',
-      zone0: 'Explore the data first (EDA)', edaAll: 'All 2022–2025', edaTrain: 'Training only 2022–2024', edaHide: 'Hide ▴', edaShow: 'Show ▾',
+      zone0: 'Explore the data first (EDA)', edaAll: 'All 2022–2025', edaTrain: 'Training only 2022–2024', edaHide: 'Hide this section ▴', edaShow: 'Show data exploration ▾',
       zone2: 'Pipeline and flaw switches', zone3: 'Evidence',
       repLabel: 'What the notebook reports', todayLabel: 'Real deployment · Jan 2026', nextLabel: 'Next month · Feb 2026',
       busy: 'Retraining…',
@@ -1337,6 +1371,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   function applyStatic() {
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i]').forEach((el) => { el.innerHTML = t(el.dataset.i); });
+    document.querySelectorAll('[data-i-title]').forEach((el) => { el.title = t(el.dataset.iTitle); });
     $('lang-th').setAttribute('aria-pressed', lang === 'th'); $('lang-en').setAttribute('aria-pressed', lang === 'en');
   }
 
@@ -1349,6 +1384,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     return `<span class="chip good">${t('within', f3(Math.abs(d)))}</span>`;
   }
   function renderBoard(m) {
+    queueMicrotask(syncStatus);
     const F = state.flaws, tm = R.split.testMonths;
     const accLine = (x) => pct(x.accuracy) + `<span class="unit">${t('accUnit')}</span>`;
     $('rep-acc').innerHTML = F.F4 ? '' : accLine(m.rep); $('rep-acc').hidden = F.F4;
@@ -1545,7 +1581,21 @@ if (typeof module !== 'undefined') module.exports = Engine;
     });
     renderAsk();
   }
+  function syncStatus() {
+    const same = (a) => FIDS.every((f) => state.flaws[f] === a[f]);
+    const on = FIDS.filter((f) => state.flaws[f]).length;
+    const mode = same(CONSULTANT) ? 'bad' : same(AUDITOR) ? 'good' : 'custom';
+    const chip = $('sb-mode');
+    chip.className = 'chip ' + (mode === 'bad' ? 'bad' : mode === 'good' ? 'good' : on ? 'warn' : 'good');
+    chip.textContent = t('modeChip', t(mode === 'bad' ? 'modeBad' : mode === 'good' ? 'modeGood' : 'modeCustom'), on, FIDS.length);
+    $('sb-consultant').setAttribute('aria-pressed', mode === 'bad'); $('sb-auditor').setAttribute('aria-pressed', mode === 'good');
+    $('sb-lr').setAttribute('aria-pressed', state.model === 'lr'); $('sb-knn').setAttribute('aria-pressed', state.model === 'knn');
+    $('sb-predict').hidden = !state.predictFirst;
+    $('predict-help').hidden = !state.predictFirst;
+    if (R) { const m = M(); $('sb-scores').textContent = t('sbScores', state.flaws.F4 ? pct(m.rep.accuracy) + ' acc' : f3(m.rep.prauc), f3(m.today.prauc)); }
+  }
   function syncPresets() {
+    queueMicrotask(syncStatus);
     const same = (a) => FIDS.every((f) => state.flaws[f] === a[f]);
     $('preset-consultant').setAttribute('aria-pressed', same(CONSULTANT));
     $('preset-auditor').setAttribute('aria-pressed', same(AUDITOR));
@@ -1792,6 +1842,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   // ================= EDA =================
   const edaCache = new Map();
   state.edaRange = 48; state.edaOpen = true; state.edaFeat = 'monthly_bill_thb';
+  try { if (localStorage.getItem('bpl-eda-open') === '0') state.edaOpen = false; } catch (e) {}
   function fmtNum(f, v) {
     if (f.endsWith('_thb')) return Math.round(v).toLocaleString('en-US');
     return Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2);
@@ -1922,7 +1973,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   }
   $('eda-all').addEventListener('click', () => { state.edaRange = 48; renderEDA(); });
   $('eda-train').addEventListener('click', () => { state.edaRange = 36; renderEDA(); });
-  $('eda-toggle').addEventListener('click', () => { state.edaOpen = !state.edaOpen; renderEDA(); });
+  $('eda-toggle').addEventListener('click', () => { state.edaOpen = !state.edaOpen; try { localStorage.setItem('bpl-eda-open', state.edaOpen ? '1' : '0'); } catch (e) {} renderEDA(); });
 
   // ================= guide =================
   let hlEls = [];
@@ -1991,7 +2042,14 @@ if (typeof module !== 'undefined') module.exports = Engine;
   $('all-off').addEventListener('click', () => applyState({ flaws: AUDITOR }));
   $('model-lr').addEventListener('click', () => { state.model = 'lr'; syncPresets(); rerun(); });
   $('model-knn').addEventListener('click', () => { state.model = 'knn'; syncPresets(); rerun(); });
-  $('predict-first').addEventListener('change', (e) => { state.predictFirst = e.target.checked; state.ask = null; renderAsk(); });
+  $('predict-first').addEventListener('change', (e) => { state.predictFirst = e.target.checked; state.ask = null; renderAsk(); syncStatus(); });
+  $('sb-consultant').addEventListener('click', () => $('preset-consultant').click());
+  $('sb-auditor').addEventListener('click', () => $('preset-auditor').click());
+  $('sb-lr').addEventListener('click', () => $('model-lr').click());
+  $('sb-knn').addEventListener('click', () => $('model-knn').click());
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([en]) => $('statusbar').classList.toggle('show', !en.isIntersecting)).observe(document.querySelector('header.top'));
+  }
   $('release').addEventListener('click', () => { state.released = true; state.driftWhich = 'next'; render(); });
   $('relock').addEventListener('click', () => { state.released = false; if (state.driftWhich === 'next') state.driftWhich = 'recent'; render(); });
   ['pred-prauc', 'pred-recall'].forEach((id) => $(id).addEventListener('input', () => { if (state.released && R) renderBoard(M()); }));
