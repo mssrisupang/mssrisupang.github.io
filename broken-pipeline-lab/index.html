@@ -239,8 +239,11 @@ table.cmp td .hint { font-family: var(--f-body); color: var(--ink-3); font-size:
 .monitor div:last-child { border-bottom: 0; }
 .monitor .chip { white-space: normal; }
 footer { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; align-items: center; }
-footer label.check { font-size: 14px; color: var(--ink-2); gap: 10px; }
-footer .check input#seed { width: 140px; height: auto; min-height: 38px; padding: 6px 10px; font-size: 16px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); }
+.seed-ctl { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+.seed-ctl input#seed { width: 84px !important; min-height: 32px !important; padding: 4px 8px !important; font-size: 14px !important; }
+.info-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); font-weight: 700; font-size: 13px; cursor: pointer; line-height: 1; }
+.info-btn[aria-expanded="true"] { background: var(--accent); color: #fff; }
+.seed-ctl input#seed { width: 140px; height: auto; min-height: 38px; padding: 6px 10px; font-size: 16px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); }
 
 /* EDA */
 .eda-body { display: grid; gap: 18px; }
@@ -343,7 +346,13 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
         <button id="model-lr" aria-pressed="true">Logistic regression</button>
         <button id="model-knn" aria-pressed="false">k-NN</button>
       </div>
+      <div class="seed-ctl" data-i-title="seedTitle">
+        <label for="seed" data-i="seed"></label>
+        <input id="seed" type="number" value="11" min="1" max="999">
+        <button class="info-btn" id="seed-info" type="button" aria-expanded="false" aria-controls="seed-help">?</button>
+      </div>
       <label class="check" data-i-title="predictTitle"><input type="checkbox" id="predict-first"> <span data-i="predictFirst"></span></label>
+      <p class="predict-help" id="seed-help" data-i="seedHelp" hidden></p>
       <p class="predict-help" id="predict-help" data-i="predictHelp" hidden></p>
     </div>
   </header>
@@ -445,7 +454,6 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
 
   <footer>
     <span data-i="footer"></span>
-    <label class="check" for="seed"><span data-i="seed"></span> <input id="seed" type="number" value="11" min="1" max="999"></label>
   </footer>
 </div>
 
@@ -981,6 +989,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
       count: (n, N) => `มีข้อผิดพลาด <b>${n}</b> จาก ${N} จุด`,
       footer: 'ข้อมูลสังเคราะห์: 20,000 บัญชี (ราว 32,000 เบอร์) ม.ค. 2022 ถึง ธ.ค. 2025 อัตราย้ายค่ายราว 4.4% พลาดลูกค้าที่จะย้าย 1 คนเสียรายได้ ฿8,000 ส่งข้อเสนอให้คนที่ไม่ได้จะย้ายเสีย ฿500 ทุกตัวเลขคำนวณสดในเบราว์เซอร์ของคุณ',
       seed: 'Dataset seed',
+      seedTitle: 'เลขตั้งต้นของตัวสุ่มที่ใช้สร้างข้อมูลจำลอง เลขเดิม = ข้อมูลชุดเดิม กด ? เพื่ออ่านคำอธิบาย',
+      seedHelp: '<b>Dataset seed คืออะไร:</b> ข้อมูลในหน้านี้เป็นข้อมูลจำลองที่สร้างด้วยตัวสุ่ม seed คือเลขตั้งต้นของตัวสุ่มนั้น (เหมือน <code>random_state</code> ใน scikit-learn) ใช้เลขเดิม จะได้ลูกค้าชุดเดิมทุกครั้ง ทุกคนในห้องจึงเห็นตัวเลขเดียวกัน เปลี่ยนเลข จะได้ลูกค้าชุดใหม่ที่มีลักษณะแบบเดียวกัน ใช้ตรวจว่าผลของแต่ละข้อผิดพลาดเกิดขึ้นจริง หรือเป็นความบังเอิญของข้อมูลชุดเดียว ค่าเริ่มต้น 11 ถูกเลือกไว้เพราะแสดงผลของทุกข้อผิดพลาดได้ชัด seed อื่นเรื่องราวเหมือนเดิม แต่ผลบางข้อ (เช่น F1, F7) อาจเล็กลงหรือกลับทิศ',
       expand: 'ขยาย ⤢', shrink: 'ขนาดปกติ ⤡', minimize: 'ย่อ ▾', doIt: 'ทำให้ดู', prev: '← ก่อนหน้า', next: 'ถัดไป →', finish: 'จบคู่มือ',
       pill: (i, n) => `คู่มือ · ขั้น ${i}/${n}`, stepOf: (i, n) => `คู่มือทีละขั้น · ขั้น ${i}/${n}`,
       kDo: 'ทำ', kLook: 'ดูตรงไหน', kWhy: 'ทำไมสำคัญ',
@@ -1033,6 +1043,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
       count: (n, N) => `<b>${n}</b> of ${N} flaws present`,
       footer: 'Synthetic data: 20,000 accounts (about 32,000 phone lines), Jan 2022 to Dec 2025, about 4.4% churn. A missed churner costs ฿8,000 in lost revenue; a retention offer to someone who would have stayed costs ฿500. Every number is computed live in your browser.',
       seed: 'Dataset seed',
+      seedTitle: 'Starting number for the random generator that creates the synthetic data. Same number = same data. Press ? for details.',
+      seedHelp: '<b>What is the dataset seed?</b> The data on this page is synthetic and made with a random generator. The seed is that generator’s starting number (like <code>random_state</code> in scikit-learn). The same seed always gives the same customers, so everyone in class sees the same numbers. A different seed gives a new set of customers with the same patterns, which lets you check whether a flaw’s effect is real or a fluke of one dataset. The default 11 was chosen because every flaw shows clearly; with other seeds the story holds but some effects (e.g. F1, F7) can shrink or flip.',
       expand: 'Expand ⤢', shrink: 'Normal size ⤡', minimize: 'Minimise ▾', doIt: 'Do it for me', prev: '← Back', next: 'Next →', finish: 'Finish',
       pill: (i, n) => `Guide · step ${i}/${n}`, stepOf: (i, n) => `Step-by-step guide · step ${i}/${n}`,
       kDo: 'Do', kLook: 'Look at', kWhy: 'Why it matters',
@@ -1216,7 +1228,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
         look: 'household_income_thb มี PSI เกิน 0.2, AUC ของ adversarial validation เกิน 0.6 และมีแพ็กเกจ 5G Unlimited ที่โมเดลไม่เคยเห็น ลองกด ม.ค. 2026 เทียบดู',
         why: 'ข้อมูลเปลี่ยนตลอด ทีมต้องกำหนดว่าจะดูอะไร เกณฑ์เตือนเท่าไร และเมื่อไรต้องเทรนใหม่ (Lab 6)' },
       { t: 'เล่นอิสระ: ภารกิจท้าทาย',
-        do: '<ul><li>หา threshold ที่ต้นทุน ม.ค. 2026 ต่ำที่สุด เทียบกับค่าที่ระบบเลือก</li><li>เริ่มจาก “ไปป์ไลน์ที่ตรวจแก้แล้ว” แล้วเปิดข้อผิดพลาดทีละจุด จุดไหนทำให้ช่องว่างระหว่างโน้ตบุ๊กกับ ม.ค. 2026 กว้างที่สุด</li><li>เปิด “ให้ทายก่อนเฉลย” แล้วแข่งกับเพื่อนว่าใครทายทิศทางคะแนนถูกมากกว่า</li><li>เปลี่ยน Dataset seed ด้านล่างสุด เรื่องราวยังเหมือนเดิมไหม</li></ul>',
+        do: '<ul><li>หา threshold ที่ต้นทุน ม.ค. 2026 ต่ำที่สุด เทียบกับค่าที่ระบบเลือก</li><li>เริ่มจาก “ไปป์ไลน์ที่ตรวจแก้แล้ว” แล้วเปิดข้อผิดพลาดทีละจุด จุดไหนทำให้ช่องว่างระหว่างโน้ตบุ๊กกับ ม.ค. 2026 กว้างที่สุด</li><li>เปิด “ให้ทายก่อนเฉลย” แล้วแข่งกับเพื่อนว่าใครทายทิศทางคะแนนถูกมากกว่า</li><li>เปลี่ยน Dataset seed (ข้างปุ่มเลือกโมเดล) เรื่องราวยังเหมือนเดิมไหม</li></ul>',
         look: 'ไม่มีคำตอบเดียว ใช้กราฟในแท็บ ③ เป็นหลักฐานอธิบายสิ่งที่เห็น',
         why: 'ทักษะเดียวกันนี้คือสิ่งที่ต้องใช้ตอนตรวจโน้ตบุ๊กจริงใน assignment' },
     ],
@@ -1270,7 +1282,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
         look: 'household_income_thb has PSI above 0.2, the adversarial validation AUC is above 0.6, and there is a 5G Unlimited plan the model has never seen. Press Jan 2026 to compare.',
         why: 'Data keeps changing. A team must decide what to watch, the alert threshold, and when to retrain (Lab 6).' },
       { t: 'Free play: challenges',
-        do: '<ul><li>Find the threshold with the lowest January 2026 cost and compare it with the one the pipeline picked.</li><li>Start from "Audited pipeline" and switch flaws on one at a time. Which one opens the biggest gap between the notebook and January 2026?</li><li>Turn on "Predict before reveal" and compete with a friend on who calls the direction right more often.</li><li>Change the Dataset seed at the bottom. Does the story hold?</li></ul>',
+        do: '<ul><li>Find the threshold with the lowest January 2026 cost and compare it with the one the pipeline picked.</li><li>Start from "Audited pipeline" and switch flaws on one at a time. Which one opens the biggest gap between the notebook and January 2026?</li><li>Turn on "Predict before reveal" and compete with a friend on who calls the direction right more often.</li><li>Change the Dataset seed (next to the model selector). Does the story hold?</li></ul>',
         look: 'There is no single answer. Use the charts in ③ as evidence for what you see.',
         why: 'These are the same skills you need when you audit a real notebook in the assignment.' },
     ],
@@ -2043,6 +2055,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   $('model-lr').addEventListener('click', () => { state.model = 'lr'; syncPresets(); rerun(); });
   $('model-knn').addEventListener('click', () => { state.model = 'knn'; syncPresets(); rerun(); });
   $('predict-first').addEventListener('change', (e) => { state.predictFirst = e.target.checked; state.ask = null; renderAsk(); syncStatus(); });
+  $('seed-info').addEventListener('click', () => { const h = $('seed-help'); h.hidden = !h.hidden; $('seed-info').setAttribute('aria-expanded', !h.hidden); });
   $('sb-consultant').addEventListener('click', () => $('preset-consultant').click());
   $('sb-auditor').addEventListener('click', () => $('preset-auditor').click());
   $('sb-lr').addEventListener('click', () => $('model-lr').click());
