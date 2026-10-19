@@ -211,6 +211,26 @@ footer { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap;
 footer label.check { font-size: 14px; color: var(--ink-2); gap: 10px; }
 footer .check input#seed { width: 140px; height: auto; min-height: 38px; padding: 6px 10px; font-size: 16px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); }
 
+/* EDA */
+.eda-body { display: grid; gap: 18px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; align-content: start; }
+.kpi .k { font-size: 12.5px; color: var(--ink-3); }
+.kpi .v { font-family: var(--f-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.kpi .s { font-size: 12px; color: var(--ink-2); }
+.eda-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.eda-grid > div { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.stats-wrap { overflow-x: auto; }
+table.stats { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+table.stats th, table.stats td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.stats th:first-child, table.stats td:first-child { text-align: left; }
+table.stats thead th { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+table.stats td { font-family: var(--f-mono); }
+.eda-q { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
+.eda-hist-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.eda-hist-head select { padding: 5px 8px; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--surface); font-family: var(--f-mono); font-size: 13px; }
+@media (max-width: 900px) { .eda-grid { grid-template-columns: minmax(0, 1fr); } }
+
 /* highlight for the guide */
 .hl { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 12px; animation: pulse 1.6s ease-in-out 2; }
 @keyframes pulse { 50% { outline-color: color-mix(in srgb, var(--accent) 25%, transparent); } }
@@ -287,6 +307,17 @@ footer .check input#seed { width: 140px; height: auto; min-height: 38px; padding
       <label class="check"><input type="checkbox" id="predict-first"> <span data-i="predictFirst"></span></label>
     </div>
   </header>
+
+  <section class="panel" id="eda-panel" aria-labelledby="eda-h">
+    <div class="panel-head">
+      <div class="zone-head"><span class="zone">0</span><h2 id="eda-h" data-i="zone0"></h2></div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Data range"><button id="eda-all" aria-pressed="true" data-i="edaAll"></button><button id="eda-train" aria-pressed="false" data-i="edaTrain"></button></div>
+        <button class="btn" id="eda-toggle"></button>
+      </div>
+    </div>
+    <div class="panel-body eda-body" id="eda-body"></div>
+  </section>
 
   <section class="board" id="board" aria-label="Scoreboard">
     <div class="board-head"><div class="zone-head"><span class="zone">1</span><h2 data-i="zone1"></h2></div><span class="small muted" data-i="zone1sub"></span></div>
@@ -826,7 +857,38 @@ var Engine = (() => {
     return { features: out, auc, newPlan };
   }
 
-  return { GP, build, run, drift, FEATURES, LEAK, monthLabel, COST_FN, COST_FP, metrics, baseline, prCurve, reliability, confusion };
+  // ---------- descriptive statistics (EDA) ----------
+  function describe(world, maxMonth) {
+    const ds = world.hist, rows = [];
+    for (let i = 0; i < ds.y.length; i++) if (ds.month[i] < maxMonth) rows.push(i);
+    const n = rows.length; let pos = 0; const accts = new Map();
+    let m0 = Infinity, m1 = -Infinity;
+    for (const r of rows) { pos += ds.y[r]; accts.set(ds.acct[r], (accts.get(ds.acct[r]) || 0) + 1); m0 = Math.min(m0, ds.month[r]); m1 = Math.max(m1, ds.month[r]); }
+    const lines = [0, 0, 0, 0, 0]; for (const c of accts.values()) lines[Math.min(5, c) - 1]++;
+    const quarters = [];
+    for (let q = 0; q * 3 < maxMonth && q < 16; q++) { let qn = 0, qp = 0; for (const r of rows) if (Math.floor(ds.month[r] / 3) === q) { qn++; qp += ds.y[r]; } quarters.push({ q, n: qn, rate: qn ? qp / qn : 0 }); }
+    const cat = (fn, labels) => labels.map((lab, k) => { let cn = 0, cp = 0; for (const r of rows) if (fn(ds.X[r]) === k) { cn++; cp += ds.y[r]; } return { lab, share: cn / n, rate: cn ? cp / cn : 0, n: cn }; });
+    const contract = cat((x) => (x[9] ? 0 : x[10] ? 2 : 1), ['month_to_month', '12_month', '24_month']);
+    const plan = cat((x) => (x[11] ? 1 : x[12] ? 2 : 0), ['4G', 'fiber_bundle', '5G']);
+    const featIdx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, LEAK];
+    const features = featIdx.map((c) => {
+      const v = new Float64Array(n); let s = 0, s2 = 0, sS = 0, nS = 0, sC = 0, nC = 0;
+      rows.forEach((r, i) => { const x = ds.X[r][c]; v[i] = x; s += x; s2 += x * x; if (ds.y[r]) { sC += x; nC++; } else { sS += x; nS++; } });
+      const sorted = Float64Array.from(v).sort();
+      const q = (p) => sorted[Math.min(n - 1, Math.floor(p * n))];
+      const mean = s / n, sd = Math.sqrt(Math.max(1e-12, s2 / n - mean * mean));
+      const lo = q(0.005), hi = q(0.995);
+      const integer = rows.every((r) => Number.isInteger(ds.X[r][c])) && hi - lo <= 15;
+      const nb = integer ? Math.max(1, hi - lo + 1) : 20, w = integer ? 1 : (hi - lo) / nb || 1;
+      const hS = new Array(nb).fill(0), hC = new Array(nb).fill(0);
+      rows.forEach((r, i) => { const x = v[i]; let b = Math.floor((x - lo) / w); b = Math.max(0, Math.min(nb - 1, b)); if (ds.y[r]) hC[b]++; else hS[b]++; });
+      return { f: FEATURES[c], mean, sd, min: sorted[0], median: q(0.5), max: sorted[n - 1], meanStay: sS / nS, meanChurn: sC / nC, d: (sC / nC - sS / nS) / sd,
+        hist: { lo, w, integer, stay: hS.map((x) => x / nS), churn: hC.map((x) => x / nC) } };
+    });
+    return { n, pos, rate: pos / n, accounts: accts.size, m0, m1, lines, quarters, contract, plan, features, nFeatures: FEATURES.length };
+  }
+
+  return { GP, build, run, drift, describe, FEATURES, LEAK, monthLabel, COST_FN, COST_FP, metrics, baseline, prCurve, reliability, confusion };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 
@@ -844,6 +906,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       openGuide: 'คู่มือทีละขั้น',
       presetBad: 'โน้ตบุ๊กของที่ปรึกษา', presetGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', predictFirst: 'ให้ทายก่อนเฉลย',
       zone1: 'ผลคะแนน: สิ่งที่รายงาน เทียบกับความจริง', zone1sub: 'เป้าหมายคือให้ช่องซ้ายใกล้ช่องกลางที่สุด ไม่ใช่ให้ช่องซ้ายสูงที่สุด',
+      zone0: 'สำรวจข้อมูลก่อนวิเคราะห์ (EDA)', edaAll: 'ทั้งหมด 2022–2025', edaTrain: 'เฉพาะ train 2022–2024', edaHide: 'ซ่อน ▴', edaShow: 'แสดง ▾',
       zone2: 'ไปป์ไลน์ และสวิตช์ข้อผิดพลาด', zone3: 'หลักฐาน',
       repLabel: 'สิ่งที่โน้ตบุ๊กรายงาน', todayLabel: 'ใช้งานจริง · ม.ค. 2026', nextLabel: 'เดือนถัดไป · ก.พ. 2026',
       busy: 'กำลังเทรนใหม่…',
@@ -887,6 +950,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       openGuide: 'Step-by-step guide',
       presetBad: "Consultant's notebook", presetGood: 'Audited pipeline', predictFirst: 'Predict before reveal',
       zone1: 'Scores: what is reported vs. what is real', zone1sub: 'The goal is to make the left column match the middle one, not to make the left one high.',
+      zone0: 'Explore the data first (EDA)', edaAll: 'All 2022–2025', edaTrain: 'Training only 2022–2024', edaHide: 'Hide ▴', edaShow: 'Show ▾',
       zone2: 'Pipeline and flaw switches', zone3: 'Evidence',
       repLabel: 'What the notebook reports', todayLabel: 'Real deployment · Jan 2026', nextLabel: 'Next month · Feb 2026',
       busy: 'Retraining…',
@@ -982,7 +1046,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
 
   // Guide steps: setup = state applied when the step opens; act = "do it for me"; hl = elements to highlight
   const STEPS = [
-    { setup: { flaws: CONSULTANT, model: 'lr', released: false, tab: 'loss' }, hl: ['board', 'pipe-panel', 'ev-panel'] },
+    { setup: { flaws: CONSULTANT, model: 'lr', released: false, tab: 'loss' }, hl: ['eda-panel', 'board', 'pipe-panel', 'ev-panel'] },
+    { setup: { flaws: CONSULTANT, model: 'lr', released: false }, hl: ['eda-panel'], eda: true },
     { setup: { flaws: CONSULTANT, model: 'lr', released: false }, act: { flaws: without('F4') }, hl: ['cell-reported', 'card-F4'] },
     { setup: { flaws: without('F4'), model: 'lr', tab: 'loss' }, act: { flaws: without('F4', 'F3') }, hl: ['card-F3', 'ev-panel'] },
     { setup: { flaws: without('F4', 'F3'), model: 'lr', tab: 'feat' }, act: { flaws: without('F4', 'F3', 'F2') }, hl: ['cell-reported', 'cell-today', 'card-F2', 'ev-panel'] },
@@ -999,8 +1064,12 @@ if (typeof module !== 'undefined') module.exports = Engine;
     th: [
       { t: 'เริ่มที่นี่: หน้านี้คืออะไร',
         do: 'อ่านสถานการณ์: ที่ปรึกษาส่งโมเดลทำนายลูกค้าย้ายค่ายมา พร้อมบอกว่าแม่นยำราว 96% คุณคือทีมตรวจสอบ (auditor) ที่ต้องหาว่าตัวเลขนี้เชื่อได้แค่ไหน',
-        look: 'หน้าจอมี 3 ส่วนตามหมายเลข: <b>① ผลคะแนน</b> เทียบ “สิ่งที่โน้ตบุ๊กรายงาน” กับ “ผลจริงตอนใช้งาน” <b>② ไปป์ไลน์</b> และสวิตช์ F1–F9 (แดง = มีข้อผิดพลาด, เขียว = แก้แล้ว) <b>③ หลักฐาน</b> แท็บกราฟที่ใช้พิสูจน์ว่าข้อผิดพลาดมีจริง',
+        look: 'หน้าจอมี 4 ส่วนตามหมายเลข: <b>⓪ สำรวจข้อมูล</b> ภาพรวมของข้อมูลก่อนสร้างโมเดล <b>① ผลคะแนน</b> เทียบ “สิ่งที่โน้ตบุ๊กรายงาน” กับ “ผลจริงตอนใช้งาน” <b>② ไปป์ไลน์</b> และสวิตช์ F1–F9 (แดง = มีข้อผิดพลาด, เขียว = แก้แล้ว) <b>③ หลักฐาน</b> แท็บกราฟที่ใช้พิสูจน์ว่าข้อผิดพลาดมีจริง',
         why: 'คู่มือจะพาไปทีละข้อผิดพลาด แต่ละขั้นจะตั้งสวิตช์ให้พร้อมเริ่ม ให้คุณลองกดเองก่อน ถ้าติด กด “ทำให้ดู” ตัวเลขที่ซื่อสัตย์สำคัญกว่าตัวเลขที่สูง' },
+      { t: 'ขั้น 0 · สำรวจข้อมูลก่อน (EDA)',
+        do: 'ดูโซน <b>⓪ สำรวจข้อมูล</b>: ตัวเลขสรุป กราฟอัตราการย้ายรายไตรมาส ตารางสถิติของแต่ละคอลัมน์ แล้วลองเลือกคอลัมน์ต่าง ๆ ในกราฟ histogram ด้านล่างสุด',
+        look: 'อัตราการย้ายค่ายแค่ราว 4% (ข้อมูลไม่สมดุล) หนึ่งบัญชีมีได้หลายเบอร์ คอลัมน์เงินบาทมีสเกลใหญ่กว่าคอลัมน์อื่นหลายพันเท่า และมีคอลัมน์หนึ่งที่ “ความต่าง (SD)” ระหว่างกลุ่มย้ายกับไม่ย้ายสูงผิดปกติ ลองหาดู',
+        why: 'ทุกข้อผิดพลาดที่จะเจอมีเบาะแสในข้อมูลตั้งแต่แรก: ข้อมูลไม่สมดุล → F4, F5 · สเกลต่างกัน → F3 · ข้อมูลเรียงตามเวลา → F6 · หลายเบอร์ต่อบัญชี → F8 · คอลัมน์ที่ดีเกินจริง → F2 ในงานจริงให้สำรวจเฉพาะข้อมูล train (ปุ่ม “เฉพาะ train”) เพื่อไม่ให้แอบเห็น test set' },
       { t: 'ขั้น 1 · accuracy 95.6% ดีจริงไหม (F4)',
         do: 'ดูช่อง ① “สิ่งที่โน้ตบุ๊กรายงาน” แล้วเทียบกับชิป Baseline ใต้ตัวเลข จากนั้น<b>ปิดสวิตช์ F4</b> ใน ②',
         look: 'accuracy ของโมเดลเท่ากับ baseline ที่ทายว่า “ไม่มีใครย้าย” พอดี หลังปิด F4 ตัวเลขใหญ่เปลี่ยนเป็น PR-AUC ≈ 0.044 เท่ากับการสุ่มเดา',
@@ -1049,8 +1118,12 @@ if (typeof module !== 'undefined') module.exports = Engine;
     en: [
       { t: 'Start here: what this page is',
         do: 'Read the scenario: a consultant delivered a churn model and claims about 96% accuracy. You are the audit team, and your job is to find out how far that number can be trusted.',
-        look: 'The screen has three numbered zones. <b>① Scores</b> compares what the notebook reports with real deployment. <b>② Pipeline</b> holds the F1–F9 switches (red = flaw present, green = fixed). <b>③ Evidence</b> has the charts that prove each flaw is real.',
+        look: 'The screen has four numbered zones. <b>⓪ Explore</b> summarises the data before any modelling. <b>① Scores</b> compares what the notebook reports with real deployment. <b>② Pipeline</b> holds the F1–F9 switches (red = flaw present, green = fixed). <b>③ Evidence</b> has the charts that prove each flaw is real.',
         why: 'The guide takes one flaw per step and sets the switches up for you at the start of each step. Try the action yourself first; press "Do it for me" if you get stuck. An honest number matters more than a high one.' },
+      { t: 'Step 0 · Explore the data first (EDA)',
+        do: 'Look at <b>⓪ Explore</b>: the summary numbers, the churn rate by quarter, the statistics table, and try different columns in the histogram at the bottom.',
+        look: 'Only about 4% churn (imbalanced). One account can have several lines. The baht columns are thousands of times larger than the others. And one column has an unusually large "difference (SD)" between churners and stayers. Find it.',
+        why: 'Every flaw you will meet leaves a clue in the data: imbalance → F4, F5 · different scales → F3 · time order → F6 · several lines per account → F8 · a column that is too good → F2. In a real project, explore the training data only ("Training only" button) so you never peek at the test set.' },
       { t: 'Step 1 · Is 95.6% accuracy good? (F4)',
         do: 'Look at ① "What the notebook reports" and compare it with the Baseline chip under it. Then <b>switch F4 off</b> in ②.',
         look: 'The accuracy equals the baseline that predicts "nobody leaves". With F4 off, the big number becomes PR-AUC ≈ 0.044, the same as guessing.',
@@ -1128,6 +1201,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
           if (m.type === 'build') { world = Engine.build(m.seed); postMessage({ id: m.id, ok: true }); }
           else if (m.type === 'run') postMessage({ id: m.id, ok: true, result: Engine.run(world, m.cfg) });
           else if (m.type === 'drift') postMessage({ id: m.id, ok: true, result: Engine.drift(world, m.which) });
+          else if (m.type === 'describe') postMessage({ id: m.id, ok: true, result: Engine.describe(world, m.maxMonth) });
         } catch (err) { postMessage({ id: m.id, ok: false, error: String(err) }); }
       };`;
     worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
@@ -1139,6 +1213,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     return new Promise((res) => setTimeout(() => {
       if (msg.type === 'build') { localWorld = E.build(msg.seed); res(true); }
       else if (msg.type === 'run') res(E.run(localWorld, msg.cfg));
+      else if (msg.type === 'describe') res(E.describe(localWorld, msg.maxMonth));
       else res(E.drift(localWorld, msg.which));
     }, 20));
   }
@@ -1259,7 +1334,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const knn = state.model === 'knn';
     const nodes = [
       { t: L('ข้อมูลดิบ', 'Raw data'), s: [knn ? L('5,600 บัญชี', '5,600 accounts') : L('20,000 บัญชี', '20,000 accounts'), L('2022 ถึง 2025', '2022 to 2025')] },
-      { t: L('คอลัมน์', 'Columns'), s: F.F2 ? [L('42 อินพุต', '42 inputs'), L('รวมคอลัมน์รั่ว', 'incl. leak')] : [L('41 อินพุต', '41 inputs'), L('ตัดคอลัมน์รั่ว', 'leak dropped')], bad: F.F2, f: F.F2 ? 'F2' : '' },
+      { t: L('คอลัมน์', 'Columns'), s: F.F2 ? [L('44 อินพุต', '44 inputs'), L('รวมคอลัมน์รั่ว', 'incl. leak')] : [L('43 อินพุต', '43 inputs'), L('ตัดคอลัมน์รั่ว', 'leak dropped')], bad: F.F2, f: F.F2 ? 'F2' : '' },
       { t: L('แบ่งข้อมูล', 'Split'), s: F.F6 ? (F.F8 ? [L('สุ่มรายแถว', 'random rows'), int(R.split.sharedAccounts) + L(' บัญชีซ้ำ', ' shared accts')] : [L('สุ่ม', 'random'), L('ตามบัญชี', 'by account')]) : [L('ตามเวลา', 'by time'), 'train ≤2024 · test 2025'], bad: F.F6 || F.F8, f: [F.F6 && 'F6', F.F8 && F.F6 && 'F8'].filter(Boolean).join(' ') },
       { t: 'Scale + select', s: [F.F1 ? L('fit กับทุกแถว', 'fitted on all rows') : L('fit กับ train', 'fitted on train'), F.F3 ? L('เงินบาทไม่ scale', 'baht left raw') : L('scale ครบ', 'all inputs scaled')], bad: F.F1 || F.F3, f: [F.F1 && 'F1', F.F3 && 'F3'].filter(Boolean).join(' ') },
       { t: knn ? 'k-NN' : 'Logistic reg.', s: [knn ? 'k = ' + R.chosen.k : 'lr ' + (F.F3 ? '1.0' : '0.2') + ', 20 epochs', F.F9 ? L('ลูกค้าย้าย ×', 'churners ×') + Math.round(R.classWeight) : L('ไม่ถ่วงน้ำหนัก', 'unweighted')], bad: F.F3 || F.F9, f: [F.F3 && 'F3', F.F9 && 'F9'].filter(Boolean).join(' ') },
@@ -1517,7 +1592,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const msg = leak ? `<p class="explain">${L(`<b style="color:var(--flaw)">retention_team_calls</b> คิดเป็น ${pct(leak.v)} ของโมเดล คอลัมน์เดียวครองโมเดลแบบนี้คือสัญญาณคลาสสิกของ leakage ให้ถามว่าค่านี้รู้ได้เมื่อไร`, `<b style="color:var(--flaw)">retention_team_calls</b> carries ${pct(leak.v)} of the model. One column dominating is the classic sign of a leak: ask when that value becomes known.`)}</p>`
       : `<p class="explain">${L('ไม่มีคอลัมน์ไหนครองโมเดล อินพุตที่ถูกเลือกเป็นค่าที่บริษัทรู้ในวันที่ให้คะแนนลูกค้า', 'No single column dominates. The selected inputs are ones the operator knows on the day it scores a customer.')}</p>`;
     const noise = R.selected.some((x) => x.startsWith('survey_q'));
-    const sel = `<p class="small muted">${L(`SelectKBest เลือกไว้ ${R.selected.length} จาก ${state.flaws.F2 ? 42 : 41} อินพุต (k ได้จากการจูน)${noise ? ' คอลัมน์ survey_q บางตัวเป็น noise ล้วนที่ถูกเลือกโดยบังเอิญ' : ''}`, `SelectKBest kept ${R.selected.length} of ${state.flaws.F2 ? 42 : 41} inputs (k chosen by tuning).${noise ? ' Some survey_q columns are pure noise that got picked by chance.' : ''}`)}</p>`;
+    const sel = `<p class="small muted">${L(`SelectKBest เลือกไว้ ${R.selected.length} จาก ${state.flaws.F2 ? 44 : 43} อินพุต (k ได้จากการจูน)${noise ? ' คอลัมน์ survey_q บางตัวเป็น noise ล้วนที่ถูกเลือกโดยบังเอิญ' : ''}`, `SelectKBest kept ${R.selected.length} of ${state.flaws.F2 ? 44 : 43} inputs (k chosen by tuning).${noise ? ' Some survey_q columns are pure noise that got picked by chance.' : ''}`)}</p>`;
     return { html: `<p class="small muted">${how}</p>` + barList(items, pct) + msg + sel };
   }
   function chartCalib() {
@@ -1584,6 +1659,124 @@ if (typeof module !== 'undefined') module.exports = Engine;
     syncPresets(); renderBoard(m); renderDiagram(m); renderFlawCards(m); renderTabs(); renderTab();
   }
 
+  // ================= EDA =================
+  const edaCache = new Map();
+  state.edaRange = 48; state.edaOpen = true; state.edaFeat = 'monthly_bill_thb';
+  function fmtNum(f, v) {
+    if (f.endsWith('_thb')) return Math.round(v).toLocaleString('en-US');
+    return Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2);
+  }
+  function bindTips(el) {
+    el.querySelectorAll('.chart').forEach((ch) => {
+      const tip = ch.querySelector('.tip'); if (!tip) return;
+      ch.querySelectorAll('[data-tip]').forEach((mk) => {
+        mk.addEventListener('pointerenter', () => {
+          const r = mk.getBoundingClientRect(), c = ch.getBoundingClientRect();
+          tip.innerHTML = mk.dataset.tip; tip.hidden = false;
+          tip.style.left = (r.left - c.left + r.width / 2) + 'px'; tip.style.top = (r.top - c.top) + 'px';
+        });
+        mk.addEventListener('pointerleave', () => { tip.hidden = true; });
+      });
+    });
+  }
+  function renderEDA() {
+    $('eda-toggle').textContent = state.edaOpen ? t('edaHide') : t('edaShow');
+    $('eda-all').setAttribute('aria-pressed', state.edaRange === 48); $('eda-train').setAttribute('aria-pressed', state.edaRange === 36);
+    const body = $('eda-body'); body.hidden = !state.edaOpen;
+    if (!state.edaOpen) return;
+    const key = state.seed + ':' + state.edaRange, d = edaCache.get(key);
+    if (!d) {
+      body.innerHTML = `<p class="explain">${L('กำลังสรุปข้อมูล…', 'Summarising the data…')}</p>`;
+      call({ type: 'describe', maxMonth: state.edaRange }).then((res) => { edaCache.set(key, res); renderEDA(); });
+      return;
+    }
+    const avgLines = d.n / d.accounts;
+    const kpis = [
+      [L('จำนวนแถว (เบอร์)', 'Rows (phone lines)'), int(d.n), L('1 แถว = 1 เบอร์ ณ วันที่ประเมิน', '1 row = 1 line on its scoring date')],
+      [L('บัญชีลูกค้า', 'Customer accounts'), int(d.accounts), L(`เฉลี่ย ${avgLines.toFixed(2)} เบอร์ต่อบัญชี`, `${avgLines.toFixed(2)} lines per account on average`)],
+      [L('ช่วงเวลา', 'Period'), `${ml(d.m0)} – ${ml(d.m1)}`, L(`${d.quarters.length} ไตรมาส`, `${d.quarters.length} quarters`)],
+      [L('อัตราการย้ายค่าย', 'Churn rate'), pct(d.rate), L(`ย้าย ${int(d.pos)} · ไม่ย้าย ${int(d.n - d.pos)}`, `${int(d.pos)} churned · ${int(d.n - d.pos)} stayed`)],
+      [L('จำนวนอินพุต', 'Input columns'), String(d.nFeatures), L('รวม survey_q 30 คอลัมน์', 'incl. 30 survey_q columns')],
+      [L('ค่าที่หายไป', 'Missing values'), '0', L('ข้อมูลสังเคราะห์ ไม่มีค่าว่าง', 'synthetic data, no gaps')],
+    ];
+    const kpiHtml = `<div class="kpis">${kpis.map(([k, v, s]) => `<div class="kpi"><span class="k">${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('')}</div>`;
+
+    // churn rate by quarter
+    const w = 520, h = 220, pad = { l: 44, r: 10, t: 12, b: 30 };
+    const qs = d.quarters, ymax = niceMax(Math.max(...qs.map((q) => q.rate)) * 1.15);
+    const a = axes(0, qs.length, 0, ymax, w, h, pad, [], ticks(ymax), () => '', (v) => (v * 100).toFixed(1) + '%');
+    const bw = (w - pad.l - pad.r) / qs.length;
+    let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${L('อัตราการย้ายค่ายรายไตรมาส', 'Churn rate by quarter')}">${a.g}`;
+    qs.forEach((q, i) => {
+      const x = pad.l + i * bw + 1, y = a.sy(q.rate), hh = h - pad.b - y;
+      s += `<rect x="${x}" y="${y}" width="${bw - 2}" height="${Math.max(0, hh)}" rx="3" fill="${q.q >= 12 ? 'var(--s2)' : 'var(--s1)'}" data-tip="Q${q.q % 4 + 1} ${2022 + Math.floor(q.q / 4)}<br>${L('อัตราการย้าย', 'churn')} ${pct(q.rate)} · ${int(q.n)} ${L('เบอร์', 'lines')}"/>`;
+      if (q.q % 4 === 0) s += `<text x="${x + 2}" y="${h - pad.b + 16}">${2022 + q.q / 4}</text>`;
+    });
+    s += `<line x1="${pad.l}" x2="${w - pad.r}" y1="${a.sy(d.rate)}" y2="${a.sy(d.rate)}" stroke="var(--ink-3)" stroke-dasharray="4 4"/><text x="${w - pad.r}" y="${a.sy(d.rate) - 5}" text-anchor="end">${L('เฉลี่ย', 'average')} ${pct(d.rate)}</text></svg>`;
+    const quarterHtml = `<div><h3>${L('อัตราการย้ายค่ายรายไตรมาส', 'Churn rate by quarter')}</h3>
+      <div class="legend-line"><span><span class="swatch" style="background:var(--s1)"></span>2022–2024 (train)</span>${state.edaRange === 48 ? '<span><span class="swatch" style="background:var(--s2)"></span>2025 (test)</span>' : ''}</div>
+      <div class="chart">${s}<div class="tip" hidden></div></div>
+      <p class="explain">${L('ข้อมูลเรียงตามเวลา และอัตราการย้ายแกว่งไปมาแต่ละไตรมาส ตอนแบ่ง train/test จึงต้องแบ่งตามเวลา (เบาะแสของ F6)', 'The data is ordered in time and the churn rate moves from quarter to quarter, so train/test must be split by time (the clue for F6).')}</p></div>`;
+
+    // categories + lines per account
+    const cname = lang === 'th'
+      ? { month_to_month: 'รายเดือน', '12_month': 'สัญญา 12 เดือน', '24_month': 'สัญญา 24 เดือน', fiber_bundle: 'Fiber bundle' }
+      : { month_to_month: 'month-to-month', '12_month': '12-month', '24_month': '24-month', fiber_bundle: 'fiber bundle' };
+    const catItems = (arr) => arr.map((c) => ({ f: `${cname[c.lab] || c.lab} (${pct(c.share)})`, v: c.rate }));
+    const catMax = Math.max(...d.contract.map((c) => c.rate), ...d.plan.map((c) => c.rate));
+    const linesItems = d.lines.map((c, i) => ({ f: `${i + 1}${i === 4 ? '+' : ''} ${L('เบอร์', i ? 'lines' : 'line')}`, v: c / d.accounts, color: 'var(--s3)' }));
+    const catHtml = `<div><h3>${L('อัตราการย้ายค่ายตามกลุ่ม', 'Churn rate by group')}</h3>
+      <p class="small muted">${L('ตัวเลขในวงเล็บคือสัดส่วนลูกค้าในกลุ่มนั้น', 'Brackets show the share of customers in each group.')}</p>
+      <span class="eyebrow">${L('ประเภทสัญญา', 'Contract')}</span>${barList(catItems(d.contract), pct, { max: catMax })}
+      <span class="eyebrow">${L('แพ็กเกจ', 'Plan')}</span>${barList(catItems(d.plan), pct, { max: catMax })}
+      <span class="eyebrow">${L('จำนวนเบอร์ต่อบัญชี (สัดส่วนบัญชี)', 'Lines per account (share of accounts)')}</span>${barList(linesItems, pct)}
+      <p class="explain">${L('ราวครึ่งหนึ่งของบัญชีมีมากกว่า 1 เบอร์ แถวของบัญชีเดียวกันจึงไม่เป็นอิสระต่อกัน (เบาะแสของ F8)', 'Close to half of the accounts have more than one line, so rows from one account are not independent (the clue for F8).')}</p></div>`;
+
+    // statistics table
+    const head = lang === 'th'
+      ? ['คอลัมน์', 'Mean', 'Median', 'Min', 'Max', 'Mean (ไม่ย้าย)', 'Mean (ย้าย)', 'ความต่าง (SD)']
+      : ['Column', 'Mean', 'Median', 'Min', 'Max', 'Mean (stayed)', 'Mean (churned)', 'Difference (SD)'];
+    const statRows = d.features.map((f) => `<tr><td>${esc(f.f)}</td><td>${fmtNum(f.f, f.mean)}</td><td>${fmtNum(f.f, f.median)}</td><td>${fmtNum(f.f, f.min)}</td><td>${fmtNum(f.f, f.max)}</td><td>${fmtNum(f.f, f.meanStay)}</td><td>${fmtNum(f.f, f.meanChurn)}</td><td>${(f.d >= 0 ? '+' : '') + f.d.toFixed(2)}</td></tr>`).join('');
+    const statHtml = `<div style="display:grid;gap:10px"><h3>${L('สถิติเชิงพรรณนาของแต่ละคอลัมน์', 'Descriptive statistics by column')}</h3>
+      <p class="small muted">${L('“ความต่าง (SD)” = (ค่าเฉลี่ยกลุ่มย้าย − ค่าเฉลี่ยกลุ่มไม่ย้าย) ÷ ส่วนเบี่ยงเบนมาตรฐาน ยิ่งห่างจาก 0 ยิ่งแยกสองกลุ่มได้ดี แสดง survey_q 2 จาก 30 คอลัมน์เป็นตัวอย่าง', '"Difference (SD)" = (mean of churners − mean of stayers) ÷ standard deviation. The further from 0, the better the column separates the groups. Two of the 30 survey_q columns are shown as examples.')}</p>
+      <div class="stats-wrap"><table class="stats"><thead><tr>${head.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>${statRows}</tbody></table></div>
+      <p class="eda-q">${L('ลองสังเกต: ค่า Max ของคอลัมน์เงินบาทต่างจากคอลัมน์อื่นกี่เท่า (เบาะแสของ F3) และคอลัมน์ไหนมี “ความต่าง” สูงเกินกว่าที่ข้อมูลจริงควรเป็น ค่านั้นรู้ได้ตอนไหน (เบาะแสของ F2)', 'Notice: how much larger are the baht columns than the rest (the clue for F3)? Which column separates the groups far better than real data usually can, and when would its value be known (the clue for F2)?')}</p></div>`;
+
+    // histogram by class
+    const F = d.features.find((x) => x.f === state.edaFeat) || d.features[1];
+    const hs = F.hist, nb = hs.stay.length;
+    const hw = 520, hh2 = 220, hp = { l: 44, r: 10, t: 12, b: 32 };
+    const hmax = niceMax(Math.max(...hs.stay, ...hs.churn) * 1.1);
+    const ha = axes(0, nb, 0, hmax, hw, hh2, hp, [], ticks(hmax), () => '', (v) => (v * 100).toFixed(0) + '%');
+    const bwh = (hw - hp.l - hp.r) / nb;
+    const edge = (i) => hs.lo + i * hs.w;
+    const every = Math.max(1, Math.round(nb / 5));
+    let hsvg = `<svg viewBox="0 0 ${hw} ${hh2}" role="img" aria-label="Histogram ${esc(F.f)}">${ha.g}`;
+    for (let i = 0; i < nb; i++) {
+      const x = hp.l + i * bwh, half = (bwh - 3) / 2;
+      const lab = hs.integer ? fmtNum(F.f, edge(i)) + (i === nb - 1 ? '+' : '') : `${fmtNum(F.f, edge(i))} – ${fmtNum(F.f, edge(i + 1))}`;
+      [['stay', 'var(--s1)', 0], ['churn', 'var(--s2)', 1]].forEach(([k, col, o]) => {
+        const v = hs[k][i], y = ha.sy(v);
+        hsvg += `<rect x="${x + 1 + o * (half + 1)}" y="${y}" width="${Math.max(1, half)}" height="${Math.max(0, hh2 - hp.b - y)}" rx="2" fill="${col}" data-tip="${esc(lab)}<br>${k === 'stay' ? L('ไม่ย้าย', 'stayed') : L('ย้าย', 'churned')}: ${pct(v)}"/>`;
+      });
+      if (i % every === 0) hsvg += `<text x="${x + bwh / 2}" y="${hh2 - hp.b + 16}" text-anchor="middle">${fmtNum(F.f, edge(i))}</text>`;
+    }
+    hsvg += '</svg>';
+    const opts = d.features.map((x) => `<option value="${x.f}" ${x.f === F.f ? 'selected' : ''}>${x.f}</option>`).join('');
+    const histHtml = `<div style="display:grid;gap:10px">
+      <div class="eda-hist-head"><h3>${L('การกระจายของข้อมูล แยกตามกลุ่ม', 'Distribution by group')}</h3><label class="small muted" for="eda-feat" style="display:inline-flex;gap:8px;align-items:center">${L('คอลัมน์', 'Column')} <select id="eda-feat">${opts}</select></label></div>
+      <div class="legend-line"><span><span class="swatch" style="background:var(--s1)"></span>${L('ไม่ย้าย', 'Stayed')}</span><span><span class="swatch" style="background:var(--s2)"></span>${L('ย้ายค่าย', 'Churned')}</span></div>
+      <div class="chart">${hsvg}<div class="tip" hidden></div></div>
+      <p class="small muted">${L('แต่ละกลุ่มคิดเป็นเปอร์เซ็นต์ของกลุ่มตัวเอง จึงเทียบรูปร่างกันได้แม้กลุ่มย้ายจะมีแค่ราว 4% ถ้าสองสีซ้อนกันเกือบหมด คอลัมน์นั้นช่วยทำนายได้น้อย', 'Each group is shown as a percentage of itself, so the shapes compare fairly even though churners are only about 4%. If the two colours overlap almost completely, the column helps little.')}</p></div>`;
+
+    body.innerHTML = kpiHtml + `<div class="eda-grid">${quarterHtml}${catHtml}</div>` + statHtml + histHtml;
+    bindTips(body);
+    $('eda-feat').addEventListener('change', (e) => { state.edaFeat = e.target.value; renderEDA(); });
+  }
+  $('eda-all').addEventListener('click', () => { state.edaRange = 48; renderEDA(); });
+  $('eda-train').addEventListener('click', () => { state.edaRange = 36; renderEDA(); });
+  $('eda-toggle').addEventListener('click', () => { state.edaOpen = !state.edaOpen; renderEDA(); });
+
   // ================= guide =================
   let hlEls = [];
   function clearHL() { hlEls.forEach((el) => el.classList.remove('hl')); hlEls = []; }
@@ -1626,6 +1819,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   }
   function goStep(k) {
     state.step = Math.max(0, Math.min(STEPS.length - 1, k));
+    if (STEPS[state.step].eda && !state.edaOpen) { state.edaOpen = true; renderEDA(); }
     saveGuide();
     applyState(STEPS[state.step].setup);
     renderGuide(true);
@@ -1650,9 +1844,9 @@ if (typeof module !== 'undefined') module.exports = Engine;
   ['pred-prauc', 'pred-recall'].forEach((id) => $(id).addEventListener('input', () => { if (state.released && R) renderBoard(M()); }));
   $('seed').addEventListener('change', async (e) => {
     const v = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 11)); e.target.value = v;
-    state.seed = v; $('busy').hidden = false; await call({ type: 'build', seed: v }); rerun();
+    state.seed = v; $('busy').hidden = false; await call({ type: 'build', seed: v }); rerun(); renderEDA();
   });
-  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); };
+  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); renderEDA(); };
   $('lang-th').addEventListener('click', () => setLang('th'));
   $('lang-en').addEventListener('click', () => setLang('en'));
 
@@ -1660,7 +1854,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   buildFlaws(); applyStatic(); flawText(); syncPresets();
   if (state.guideOpen) { const s = STEPS[state.step].setup; if (s) { if (s.flaws) state.flaws = { ...s.flaws }; if (s.model) state.model = s.model; if ('released' in s) state.released = s.released; if (s.tab) state.tab = s.tab; if (s.drift) state.driftWhich = s.drift; syncPresets(); } }
   renderGuide(false);
-  call({ type: 'build', seed: state.seed }).then(rerun);
+  call({ type: 'build', seed: state.seed }).then(() => { rerun(); renderEDA(); });
 })();
 </script>
 
