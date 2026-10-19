@@ -260,6 +260,32 @@ table.stats.interp td.num { font-family: var(--f-mono); white-space: nowrap; tex
 .learn .tag { justify-self: start; }
 .discuss { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 
+/* quiz (zone 5) */
+.quiz-body { display: grid; gap: 12px; max-width: 860px; }
+.qhead { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.qprog { display: flex; gap: 4px; }
+.qprog span { flex: 1; height: 6px; border-radius: 3px; background: var(--rule); }
+.qprog span.cur { background: var(--accent); }
+.qprog span.ok { background: var(--fixed); }
+.qprog span.no { background: var(--flaw); }
+.qstem { font-size: 18px; line-height: 1.4; }
+.qtry { font-size: 13.5px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.qopts { display: grid; gap: 8px; }
+.qopt { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; text-align: left; padding: 10px 12px; border: 1.5px solid var(--rule-strong); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 14.5px; }
+.qopt:hover:not(:disabled) { border-color: var(--accent); }
+.qopt .ql { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); font-family: var(--f-mono); font-weight: 600; font-size: 13px; }
+.qopt.sel { border-color: var(--accent); background: var(--accent-soft); }
+.qopt.sel .ql { background: var(--accent); color: #fff; }
+.qopt.right { border-color: var(--fixed); background: var(--fixed-soft); }
+.qopt.right .ql { background: var(--fixed); color: #fff; }
+.qopt.wrong { border-color: var(--flaw); background: var(--flaw-soft); }
+.qopt.wrong .ql { background: var(--flaw); color: #fff; }
+.qopt:disabled { cursor: default; }
+.qfb { border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.qfb.ok { background: var(--fixed-soft); } .qfb.ok b { color: var(--fixed); }
+.qfb.no { background: var(--flaw-soft); } .qfb.no b { color: var(--flaw); }
+.qact { display: flex; gap: 8px; }
+
 /* EDA */
 .eda-body { display: grid; gap: 18px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -349,6 +375,7 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
     </div>
     <div class="controls">
       <button class="btn guide-btn" id="open-guide" data-i="openGuide"></button>
+      <button class="btn guide-btn" id="open-quiz" data-i="openQuiz"></button>
       <div class="seg" role="group" aria-label="Language">
         <button id="lang-th" aria-pressed="true">ไทย</button>
         <button id="lang-en" aria-pressed="false">EN</button>
@@ -470,6 +497,11 @@ table.stats.dict td.mono { font-family: var(--f-mono); }
   <section class="panel" id="sum-panel" aria-labelledby="sum-h">
     <div class="panel-head"><div class="zone-head"><span class="zone">4</span><h2 id="sum-h" data-i="zone4"></h2></div><div class="controls"><span class="small muted" data-i="zone4sub"></span><button class="btn" id="sum-toggle" aria-controls="sum-body"></button></div></div>
     <div class="panel-body sum-body" id="sum-body"></div>
+  </section>
+
+  <section class="panel" id="quiz-panel" aria-labelledby="quiz-h">
+    <div class="panel-head"><div class="zone-head"><span class="zone">5</span><h2 id="quiz-h" data-i="zone5"></h2></div><button class="btn" id="quiz-toggle" aria-controls="quiz-body"></button></div>
+    <div class="panel-body quiz-body" id="quiz-body"></div>
   </section>
 
   <footer>
@@ -985,7 +1017,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   const I = {
     th: {
       lede: 'ที่ปรึกษาคนหนึ่งสร้างโมเดลทำนายลูกค้าที่จะย้ายค่าย (churn) ให้บริษัทมือถือ แล้วบอกว่า “พร้อมใช้งานจริง” แต่ในโน้ตบุ๊กมีข้อผิดพลาดซ่อนอยู่ 9 จุด (F1–F9) คุณคือทีมตรวจสอบ: ปิดข้อผิดพลาดทีละจุด แล้วดูว่าคะแนนที่โน้ตบุ๊กรายงานต่างจากผลจริงกับลูกค้าใหม่แค่ไหน ถ้าเพิ่งเข้ามาครั้งแรก กด “คู่มือทีละขั้น”',
-      openGuide: 'คู่มือทีละขั้น',
+      openGuide: 'คู่มือทีละขั้น', openQuiz: 'ทดสอบความเข้าใจ', zone5: 'ทดสอบความเข้าใจ (Check yourself)',
       presetBad: 'โน้ตบุ๊กของที่ปรึกษา', presetGood: 'ไปป์ไลน์ที่ตรวจแก้แล้ว', predictFirst: 'โหมดทายผล (ถามก่อนเฉลย)',
       predictTitle: 'เมื่อเปิด ทุกครั้งที่กดสวิตช์ F1–F9 จะถามให้ทายก่อนว่าคะแนนจะขึ้นหรือลง',
       predictHelp: '<b>โหมดทายผลเปิดอยู่:</b> เมื่อกดสวิตช์ F1–F9 สวิตช์จะยังไม่เปลี่ยนทันที แต่จะมีคำถามในการ์ดนั้นว่า “คะแนนที่โน้ตบุ๊กรายงานจะ สูงขึ้น / ลดลง / เท่าเดิม” ตอบแล้วโมเดลจึงเทรนใหม่และเฉลยว่าทายถูกไหม ใช้ฝึกคาดผลของแต่ละข้อผิดพลาดก่อนเห็นคำตอบ เหมาะกับการเล่นในห้องเรียน',
@@ -1040,7 +1072,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     },
     en: {
       lede: 'A consultant built a churn model for a mobile operator and says it is ready to deploy. Their notebook hides nine mistakes (F1–F9). You are the audit team: switch the mistakes off one at a time and watch how far the score the notebook reports is from how the model really does on new customers. First time here? Press "Step-by-step guide".',
-      openGuide: 'Step-by-step guide',
+      openGuide: 'Step-by-step guide', openQuiz: 'Check yourself', zone5: 'Check yourself',
       presetBad: "Consultant's notebook", presetGood: 'Audited pipeline', predictFirst: 'Guess mode (predict before reveal)',
       predictTitle: 'When on, every time you flip an F1–F9 switch you first guess whether the score will go up or down',
       predictHelp: '<b>Guess mode is on:</b> flipping an F1–F9 switch does not apply it straight away. The card first asks whether the score the notebook reports will go up, go down or stay the same. After you answer, the model retrains and the card tells you whether you were right. Use it to practise predicting each flaw before seeing the result, for example as a class game.',
@@ -1672,6 +1704,205 @@ if (typeof module !== 'undefined') module.exports = Engine;
   }
 
 
+  // ================= zone 5: check yourself (random 8 of 20 MCQ) =================
+  const LOS = [
+    { id: 'LO1', th: 'Data leakage และ Pipeline', en: 'Data leakage and pipelines', lab: 'Lab 1' },
+    { id: 'LO2', th: 'การ optimize: scale และ learning rate', en: 'Optimisation: scaling and learning rate', lab: 'Lab 2' },
+    { id: 'LO3', th: 'ความน่าจะเป็นและ log loss', en: 'Probabilities and log loss', lab: 'Lab 3' },
+    { id: 'LO4', th: 'การแบ่งข้อมูลและการใช้ test set', en: 'Data splits and the test set', lab: 'Lab 4' },
+    { id: 'LO5', th: 'ตัวชี้วัดและ threshold บนข้อมูลไม่สมดุล', en: 'Metrics and thresholds on imbalanced data', lab: 'Lab 5' },
+    { id: 'LO6', th: 'Data shift และการเฝ้าระวัง', en: 'Data shift and monitoring', lab: 'Lab 6' },
+  ];
+  // q / opts / why / try = [Thai, English]; a = index of the correct option; go = where "show me" jumps
+  const QB = [
+    { lo: 'LO5', go: { el: 'cell-reported' },
+      q: ['โน้ตบุ๊กของที่ปรึกษารายงาน accuracy ราว 96% ข้อใดอธิบายตัวเลขนี้ได้ดีที่สุด', 'The consultant’s notebook reports about 96% accuracy. What best explains this number?'],
+      opts: [['โมเดลแยกลูกค้าที่จะย้ายได้ดีมาก', 'The model separates churners very well'], ['เท่ากับการทายว่า “ไม่มีใครย้าย” เพราะลูกค้าย้ายแค่ราว 4%', 'It equals predicting “nobody leaves”, because only about 4% churn'], ['threshold ถูกตั้งไว้ต่ำเกินไป', 'The threshold is set too low'], ['ข้อมูลเทรนมีมากพอ', 'There is enough training data']],
+      a: 1, why: ['ชิป baseline ในโซน ① แสดงว่าการทายว่าไม่มีใครย้ายก็ได้ accuracy เท่ากัน ข้อมูลไม่สมดุลทำให้ accuracy หลอกตา', 'The baseline chip in zone ① shows that predicting nobody leaves scores the same. Imbalanced data makes accuracy misleading.'],
+      try: ['เลือก “โน้ตบุ๊กของที่ปรึกษา” แล้วดูชิป Baseline ในโซน ①', 'Pick “Consultant’s notebook” and read the Baseline chip in zone ①'] },
+    { lo: 'LO5', go: { el: 'tabs', tab: 'pr' },
+      q: ['PR-AUC ของโมเดลที่สุ่มเดาจะมีค่าประมาณเท่าใด', 'Roughly what PR-AUC does a model that guesses at random get?'],
+      opts: [['0.5 เสมอ', 'Always 0.5'], ['0', '0'], ['เท่ากับอัตราการย้ายค่าย (ราว 0.04 ในข้อมูลนี้)', 'The churn rate (about 0.04 here)'], ['1.0', '1.0']],
+      a: 2, why: ['เส้นประในกราฟ Precision–recall คือระดับสุ่มเดา ซึ่งเท่ากับสัดส่วนคลาสบวก ต่างจาก ROC-AUC ที่สุ่มเดาได้ 0.5', 'The dashed line in the precision–recall chart is the guessing level, equal to the positive rate. ROC-AUC, by contrast, gives 0.5 for guessing.'],
+      try: ['เปิดแท็บ ③ Precision–recall แล้วดูเส้นประ', 'Open the ③ Precision–recall tab and read the dashed line'] },
+    { lo: 'LO5', go: { el: 'tabs', tab: 'cost' },
+      q: ['ทำไม threshold ที่ทำให้ต้นทุนต่ำที่สุดจึงต่ำกว่า 0.5 มาก', 'Why is the cheapest threshold far below 0.5?'],
+      opts: [['เพราะข้อมูลเทรนมีมาก', 'Because there is a lot of training data'], ['เพราะพลาดลูกค้าที่จะย้าย 1 คน (฿8,000) แพงกว่าส่งข้อเสนอเปล่า 1 ครั้ง (฿500) ถึง 16 เท่า', 'Because missing one churner (฿8,000) costs 16 times more than one wasted offer (฿500)'], ['เพราะโมเดล overfit', 'Because the model overfits'], ['เพราะ log loss สูง', 'Because log loss is high']],
+      a: 1, why: ['เมื่อพลาดแพงกว่ามาก การส่งข้อเสนอเผื่อไว้คุ้มกว่า threshold จึงควรมาจากต้นทุนธุรกิจ ไม่ใช่ค่าเริ่มต้น 0.5', 'When a miss costs far more, sending spare offers pays. The threshold should come from business costs, not the 0.5 default.'],
+      try: ['ปิด F5 แล้วดูเส้นต้นทุนในแท็บ ③ Threshold และต้นทุน', 'Switch F5 off and read the cost curve in ③ Threshold & cost'] },
+    { lo: 'LO5', go: { el: 'tabs', tab: 'cost' },
+      q: ['ถ้าลด threshold จาก 0.5 เหลือราว 0.05 จะเกิดอะไรขึ้น', 'If you lower the threshold from 0.5 to about 0.05, what happens?'],
+      opts: [['recall สูงขึ้น และ precision ลดลง', 'Recall rises and precision falls'], ['ทั้ง recall และ precision สูงขึ้น', 'Both recall and precision rise'], ['recall ลดลง', 'Recall falls'], ['PR-AUC เปลี่ยนไปมาก', 'PR-AUC changes a lot']],
+      a: 0, why: ['threshold ต่ำทำให้ส่งข้อเสนอให้คนมากขึ้น จับคนที่จะย้ายได้มากขึ้น แต่ส่งผิดคนมากขึ้นด้วย ส่วน PR-AUC วัดการจัดอันดับจึงไม่ขึ้นกับ threshold', 'A lower threshold flags more customers: more churners caught, more wasted offers. PR-AUC measures ranking, so the threshold does not change it.'],
+      try: ['เลื่อน slider ในแท็บ ③ Threshold และต้นทุน แล้วดู confusion matrix', 'Move the slider in ③ Threshold & cost and watch the confusion matrix'] },
+    { lo: 'LO1', go: { el: 'tabs', tab: 'feat' },
+      q: ['ทำไม retention_team_calls จึงใช้เป็นอินพุตของโมเดลไม่ได้', 'Why can retention_team_calls not be used as a model input?'],
+      opts: [['เพราะมีค่าว่างมาก', 'Because it has many missing values'], ['เพราะสเกลใหญ่เกินไป', 'Because its scale is too large'], ['เพราะบันทึกหลังลูกค้าขอยกเลิกแล้ว ณ วันที่ต้องทำนายจึงเป็น 0 เสมอ', 'Because it is recorded after the customer asks to cancel, so it is always 0 when we predict'], ['เพราะเป็นตัวแปรกลุ่ม', 'Because it is categorical']],
+      a: 2, why: ['ค่าที่รู้ได้หลังผลลัพธ์เกิดคือ target leakage ทำให้คะแนนบน test สูงมาก แต่ใช้งานจริงแล้ว recall เป็น 0', 'A value known only after the outcome is target leakage: a huge test score, but zero recall in deployment.'],
+      try: ['ดูแท็บ ③ ฟีเจอร์ และแถวสีแดงในพจนานุกรมข้อมูลโซน ⓪', 'Check ③ Features and the red row in the zone ⓪ data dictionary'] },
+    { lo: 'LO1', go: { el: 'card-F1' },
+      q: ['การ fit scaler กับข้อมูลทั้งหมดก่อนแบ่ง (F1) แทบไม่เปลี่ยนคะแนน ทำไมยังนับเป็นข้อผิดพลาด', 'Fitting the scaler on all rows before the split (F1) barely changes the score. Why is it still a flaw?'],
+      opts: [['เพราะทำให้เทรนช้า', 'Because it slows training'], ['เพราะ test set ไม่ใช่ข้อมูลที่ไม่เคยเห็นแล้ว การประเมินจึงไม่ซื่อสัตย์ และในข้อมูลที่มีคอลัมน์มาก ผลอาจใหญ่', 'Because the test set is no longer unseen, so the evaluation is dishonest, and with many columns the effect can be large'], ['เพราะทำให้ accuracy ลดลง', 'Because it lowers accuracy'], ['ไม่นับเป็นข้อผิดพลาด', 'It is not a flaw']],
+      a: 1, why: ['ความผิดอยู่ที่กระบวนการ ทุกขั้นที่เรียนรู้จากข้อมูลต้องอยู่ใน Pipeline และ fit กับ train เท่านั้น', 'The fault is in the process: every step that learns from data belongs inside a Pipeline fitted on training data only.'],
+      try: ['สลับ F1 เปิด/ปิด แล้วอ่านตัวเลขในการ์ด F1', 'Toggle F1 and read the number on the F1 card'] },
+    { lo: 'LO1', go: { el: 'eda-panel' },
+      q: ['การแปลงข้อมูลแบบใดทำก่อนแบ่ง train/test ได้โดยไม่ทำให้ข้อมูลรั่ว', 'Which transformation is safe to do before the train/test split?'],
+      opts: [['StandardScaler', 'StandardScaler'], ['SelectKBest', 'SelectKBest'], ['แปลงวันเกิดเป็นอายุด้วยสูตรตายตัว', 'Turning a birth date into age with a fixed formula'], ['เติมค่าว่างด้วยค่าเฉลี่ยของคอลัมน์', 'Filling gaps with the column mean']],
+      a: 2, why: ['สูตรตายตัวไม่ได้เรียนอะไรจากข้อมูล จึงไม่รั่ว ส่วนสามข้อที่เหลือคำนวณสถิติจากข้อมูล ต้องทำใน Pipeline หลังแบ่ง', 'A fixed formula learns nothing from the data. The other three compute statistics, so they belong in the Pipeline after the split.'],
+      try: ['อ่านพจนานุกรมข้อมูลในโซน ⓪', 'Read the data dictionary in zone ⓪'] },
+    { lo: 'LO2', go: { el: 'tabs', tab: 'loss' },
+      q: ['loss กระโดดไปมาแทนที่จะลดลง สาเหตุที่เป็นไปได้มากที่สุดคืออะไร', 'The loss jumps around instead of falling. What is the most likely cause?'],
+      opts: [['ข้อมูลไม่สมดุล', 'Imbalanced data'], ['อินพุตไม่ได้ scale และ learning rate สูงเกินไป', 'Unscaled inputs and a learning rate that is too high'], ['ใช้ test set จูนโมเดล', 'Tuning on the test set'], ['threshold ต่ำเกินไป', 'A threshold that is too low']],
+      a: 1, why: ['อินพุตหน่วยบาทมีค่าหลักหมื่น gradient จึงใหญ่ learning rate สูงทำให้ก้าวเลยจุดต่ำสุดทุกครั้ง', 'Baht inputs are in the tens of thousands, so gradients are huge and a high learning rate overshoots every step.'],
+      try: ['เปิดแท็บ ③ Loss curve แล้วสลับ F3', 'Open ③ Loss curve and toggle F3'] },
+    { lo: 'LO2', go: { el: 'tabs', tab: 'loss' },
+      q: ['ทำไมการพิมพ์เฉพาะ loss ของ mini-batch สุดท้ายจึงหลอกตา', 'Why is printing only the last mini-batch loss misleading?'],
+      opts: [['เพราะ batch เดียวอาจต่ำโดยบังเอิญ และไม่แทนข้อมูลทั้งหมด', 'One batch can be low by chance and does not represent all the data'], ['เพราะ mini-batch ช้ากว่า full batch', 'Mini-batches are slower than full batches'], ['เพราะทำให้ overfit', 'It causes overfitting'], ['ไม่หลอกตา', 'It is not misleading']],
+      a: 0, why: ['ต้องดู loss ของทั้ง epoch จึงจะรู้ว่าโมเดลลู่เข้าจริงหรือไม่', 'Only the full-epoch loss tells you whether training really converges.'],
+      try: ['เปิด F3 แล้วเทียบจุดสีเขียวกับเส้นสีส้มใน Loss curve', 'Switch F3 on and compare the green dots with the orange line in the loss curve'] },
+    { lo: 'LO2', go: { el: 'tabs', tab: 'loss' },
+      q: ['หลัง scale อินพุตแล้ว ข้อใดถูกต้อง', 'After scaling the inputs, which statement is true?'],
+      opts: [['ต้องใช้ learning rate เล็กลงมาก', 'You need a much smaller learning rate'], ['ใช้ learning rate ค่าปกติ (เช่น 0.1) ได้ และ loss ลดลงอย่างราบรื่น', 'An ordinary learning rate (e.g. 0.1) works and the loss falls smoothly'], ['ไม่ต้องใช้ gradient descent อีก', 'Gradient descent is no longer needed'], ['PR-AUC จะเป็น 1.0', 'PR-AUC becomes 1.0']],
+      a: 1, why: ['เมื่อทุกอินพุตอยู่สเกลเดียวกัน ความชันในแต่ละทิศใกล้กัน learning rate ค่าเดียวจึงใช้ได้กับทุกน้ำหนัก', 'With every input on one scale, the slopes are similar in every direction, so one learning rate suits all weights.'],
+      try: ['ปิด F3 แล้วดู Loss curve', 'Switch F3 off and look at the loss curve'] },
+    { lo: 'LO3', go: { el: 'tabs', tab: 'calib' },
+      q: ['เปิด F9 (class_weight balanced) แล้ว PR-AUC แทบเท่าเดิม แต่ log loss แย่ลง หมายความว่าอะไร', 'With F9 (balanced class weights) PR-AUC stays about the same but log loss gets worse. What does that mean?'],
+      opts: [['โมเดลจัดอันดับยังถูก แต่ความน่าจะเป็นสูงเกินจริง', 'The ranking is still right, but the probabilities are too high'], ['โมเดลจัดอันดับผิด', 'The ranking is wrong'], ['ข้อมูลรั่ว', 'Data is leaking'], ['ต้องเพิ่ม learning rate', 'The learning rate must go up']],
+      a: 0, why: ['PR-AUC วัดลำดับ ส่วน log loss วัดว่าค่าความน่าจะเป็นตรงความจริงไหม การถ่วงน้ำหนักเลื่อนความน่าจะเป็นขึ้นทั้งชุด', 'PR-AUC measures order; log loss measures whether the probabilities are right. Weighting shifts every probability up.'],
+      try: ['เปิดแท็บ ③ Calibration แล้วสลับ F9', 'Open ③ Calibration and toggle F9'] },
+    { lo: 'LO3', go: { el: 'tabs', tab: 'calib' },
+      q: ['ในกราฟ calibration ถ้าจุดอยู่ใต้เส้นทแยง หมายความว่าอย่างไร', 'In the calibration chart, what do points below the diagonal mean?'],
+      opts: [['โมเดลทำนายต่ำกว่าความจริง', 'The model predicts too low'], ['โมเดลทำนายความน่าจะเป็นสูงกว่าสัดส่วนที่ย้ายจริง', 'The model predicts higher probabilities than the share that actually churns'], ['โมเดลสมบูรณ์แบบ', 'The model is perfect'], ['ไม่มีความหมาย', 'Nothing']],
+      a: 1, why: ['แกนนอนคือที่ทำนาย แกนตั้งคือที่เกิดจริง จุดใต้เส้นคือทำนาย 40% แต่ย้ายจริงน้อยกว่านั้น', 'The x-axis is predicted, the y-axis is observed; below the line means a predicted 40% churns less often than that.'],
+      try: ['เปิด F9 แล้วดูแท็บ ③ Calibration', 'Switch F9 on and look at ③ Calibration'] },
+    { lo: 'LO3', go: { el: 'cmp' },
+      q: ['สองโมเดลมี accuracy เท่ากัน แต่ log loss เป็น 0.07 กับ 0.30 ควรเชื่อโมเดลไหน', 'Two models have the same accuracy, but log loss of 0.07 and 0.30. Which do you trust?'],
+      opts: [['0.30 เพราะตัวเลขสูงกว่า', '0.30, because the number is higher'], ['0.07 เพราะความน่าจะเป็นใกล้ความจริงกว่า', '0.07, because its probabilities are closer to reality'], ['เท่ากัน เพราะ accuracy เท่ากัน', 'They are equal, because accuracy is equal'], ['ตัดสินไม่ได้', 'You cannot tell']],
+      a: 1, why: ['log loss ยิ่งต่ำยิ่งดี และลงโทษความมั่นใจที่ผิดมาก จึงใช้แยกโมเดลที่ accuracy เท่ากันได้', 'Lower log loss is better and it punishes confident mistakes, so it separates models that tie on accuracy.'],
+      try: ['ดูแถว Log loss ในตารางโซน ①', 'Read the Log loss row in the zone ① table'] },
+    { lo: 'LO4', go: { el: 'card-F6' },
+      q: ['ทำไมการแบ่งข้อมูลแบบสุ่ม เมื่อข้อมูลเรียงตามเวลา จึงให้คะแนนเกินจริง', 'Why does a random split on time-ordered data give an optimistic score?'],
+      opts: [['เพราะ test set เล็กเกินไป', 'The test set is too small'], ['เพราะ test มาจากช่วงเวลาที่โมเดลเห็นแล้ว ไม่เหมือนการทำนายอนาคตตอนใช้งานจริง', 'The test rows come from months the model already saw, unlike predicting the future in deployment'], ['เพราะ learning rate สูง', 'The learning rate is high'], ['เพราะ threshold เป็น 0.5', 'The threshold is 0.5']],
+      a: 1, why: ['ตอนใช้งานจริงโมเดลต้องทำนายเดือนที่ยังไม่เกิด จึงต้องเทรนด้วยข้อมูลเก่าและทดสอบกับข้อมูลใหม่กว่า', 'In deployment the model predicts months that have not happened yet, so train on older data and test on newer data.'],
+      try: ['สลับ F6 แล้วดูเดือนในการ์ด F6 และชิปใต้ช่อง ม.ค.', 'Toggle F6 and read the months on the F6 card and the chip under January'] },
+    { lo: 'LO4', go: { el: 'card-F7' },
+      q: ['ลอง hyperparameter 9 ค่าแล้วเลือกค่าที่คะแนน test ดีที่สุด ผลคืออะไร', 'You try 9 hyperparameter settings and keep the one with the best test score. What is the result?'],
+      opts: [['ได้โมเดลที่ดีที่สุดแน่นอน', 'You are sure to get the best model'], ['คะแนน test ไม่ใช่การประเมินที่ซื่อสัตย์อีกต่อไป ควรจูนบน validation และใช้ test ครั้งเดียว', 'The test score is no longer an honest estimate; tune on validation and use the test set once'], ['โมเดลจะ underfit', 'The model underfits'], ['ไม่มีผลอะไร', 'Nothing changes']],
+      a: 1, why: ['การเลือกจาก test คือการใช้ test เป็นข้อมูลเทรนทางอ้อม คะแนนที่ได้จึงเฟ้อ', 'Choosing on the test set uses it as training data in disguise, so its score is inflated.'],
+      try: ['ดูจำนวนครั้งที่แอบดูในการ์ด F7 และเส้นประแดงในแผนภาพ ②', 'Read the peek count on the F7 card and the red dashed line in diagram ②'] },
+    { lo: 'LO4', go: { el: 'card-F8' },
+      q: ['ทำไม F8 ทำให้คะแนนของ k-NN สูงขึ้นมาก แต่ logistic regression แทบไม่เปลี่ยน', 'Why does F8 raise the k-NN score a lot but barely change logistic regression?'],
+      opts: [['เพราะ k-NN “จำ” เบอร์อื่นในบัญชีเดียวกันที่ข้อมูลเกือบเหมือนกันได้ ส่วน logistic regression จำรายคนไม่ได้', 'k-NN “remembers” sibling lines of the same account with near-identical data; logistic regression cannot memorise individuals'], ['เพราะ k-NN เร็วกว่า', 'k-NN is faster'], ['เพราะ logistic regression ใช้ threshold', 'Logistic regression uses a threshold'], ['เพราะ k-NN ไม่ต้อง scale', 'k-NN needs no scaling']],
+      a: 0, why: ['แถวของลูกค้าคนเดียวกันไม่เป็นอิสระต่อกัน ต้องแบ่งตาม account_id (GroupKFold) ให้คนเดียวกันอยู่ฝั่งเดียว', 'Rows from one customer are not independent. Split by account_id (GroupKFold) so each customer stays on one side.'],
+      try: ['เลือก k-NN เปิด F6 แล้วสลับ F8', 'Pick k-NN, switch F6 on and toggle F8'] },
+    { lo: 'LO6', go: { el: 'tabs', tab: 'drift' },
+      q: ['adversarial validation ได้ AUC ราว 0.5 หมายความว่าอะไร', 'Adversarial validation gives an AUC of about 0.5. What does that mean?'],
+      opts: [['ข้อมูลใหม่ต่างจากข้อมูลเทรนมาก', 'The new data is very different from training data'], ['อินพุตใหม่หน้าตาเหมือนข้อมูลเทรน แต่โมเดลยังแย่ลงได้ถ้าความสัมพันธ์เปลี่ยน (concept drift)', 'The new inputs look like the training data, but the model can still degrade if relationships change (concept drift)'], ['โมเดลแม่นยำ 50%', 'The model is 50% accurate'], ['ต้องเทรนใหม่ทันที', 'You must retrain immediately']],
+      a: 1, why: ['AUC 0.5 คือแยกเก่ากับใหม่ไม่ได้ ไม่มี covariate shift แต่ concept drift ต้องรอ label จริงจึงจะเห็น', 'AUC 0.5 means old and new cannot be told apart: no covariate shift. Concept drift only shows once real labels arrive.'],
+      try: ['ในแท็บ ③ Drift เลือก ม.ค. 2026', 'In ③ Drift, pick Jan 2026'] },
+    { lo: 'LO6', go: { el: 'cell-next' },
+      q: ['เดือน ก.พ. อัตราการย้ายเพิ่มขึ้น แต่ PR-AUC อาจไม่ลดลงมาก ควรดูตัวชี้วัดใดประกอบ', 'In February churn rises but PR-AUC may not drop much. What should you check as well?'],
+      opts: [['accuracy อย่างเดียว', 'Accuracy alone'], ['recall และต้นทุนต่อ 1,000 คน เพราะ PR-AUC ขึ้นกับอัตราการย้ายด้วย', 'Recall and cost per 1,000, because PR-AUC also depends on the churn rate'], ['จำนวน epoch', 'The number of epochs'], ['ค่า seed', 'The seed']],
+      a: 1, why: ['PR-AUC ของการสุ่มเดาเท่ากับอัตราการย้าย เมื่ออัตราสูงขึ้น PR-AUC จึงอาจดูไม่แย่ ทั้งที่จับคนที่จะย้ายได้น้อยลงและเสียเงินมากขึ้น', 'Guessing PR-AUC equals the churn rate, so a higher rate props PR-AUC up even while fewer churners are caught and costs rise.'],
+      try: ['เลือก “ไปป์ไลน์ที่ตรวจแก้แล้ว” แล้วกด “เปิดข้อมูล ก.พ.”', 'Pick “Audited pipeline” and press “Release Feb data”'] },
+    { lo: 'LO6', go: { el: 'tabs', tab: 'drift' },
+      q: ['กฎเฝ้าระวัง (monitoring) ข้อใดเหมาะที่สุดหลังนำโมเดลไปใช้', 'Which monitoring rule fits best after deployment?'],
+      opts: [['เช็กเฉพาะตอนที่ลูกค้าร้องเรียน', 'Check only when customers complain'], ['เตือนเมื่อ PSI ของอินพุตใดเกิน 0.2 หรือ recall ของเดือนที่ได้ label แล้วต่ำกว่าเกณฑ์ แล้วเทรนใหม่', 'Alert when any input’s PSI exceeds 0.2 or labelled-month recall falls below target, then retrain'], ['เทรนใหม่ทุกวันโดยไม่ต้องตรวจ', 'Retrain every day without checking'], ['ไม่ต้องทำ ถ้าคะแนน test ดี', 'Nothing, if the test score was good']],
+      a: 1, why: ['ดูทั้งอินพุต (PSI, adversarial AUC) และผลลัพธ์เมื่อ label มาถึง พร้อมเกณฑ์ที่เป็นตัวเลขและแผนเทรนใหม่', 'Watch inputs (PSI, adversarial AUC) and outcomes once labels arrive, with numeric thresholds and a retraining plan.'],
+      try: ['ดูตาราง “กฎการเฝ้าระวัง” ในแท็บ ③ Drift', 'Read the monitoring rules in ③ Drift'] },
+    { lo: 'LO4', go: { el: 'eda-panel' },
+      q: ['ใน EDA พบว่าหนึ่งบัญชีมีได้หลายเบอร์ ควรทำอย่างไรตอนแบ่งข้อมูล', 'EDA shows one account can have several lines. What should you do when splitting?'],
+      opts: [['สุ่มรายแถวตามปกติ', 'Split rows at random as usual'], ['แบ่งตาม account_id ให้ทุกเบอร์ของบัญชีเดียวกันอยู่ฝั่งเดียว', 'Split by account_id so all lines of an account stay on one side'], ['ลบบัญชีที่มีหลายเบอร์ทิ้ง', 'Delete accounts with several lines'], ['เพิ่ม learning rate', 'Raise the learning rate']],
+      a: 1, why: ['ถ้าเบอร์พี่น้องอยู่ทั้ง train และ test โมเดลจะ “จำ” คำตอบได้ คะแนนจึงเกินจริง', 'If sibling lines sit in both train and test, the model can memorise the answer and the score is inflated.'],
+      try: ['ดูกราฟจำนวนเบอร์ต่อบัญชีในโซน ⓪', 'Look at the lines-per-account bars in zone ⓪'] },
+  ];
+
+  const quiz = { phase: 'intro', items: [], i: 0, picked: null, checked: false, answers: [] };
+  state.quizOpen = true;
+  try { if (localStorage.getItem('bpl-quiz-open') === '0') state.quizOpen = false; } catch (e) {}
+  const QL = (pair) => (lang === 'th' ? pair[0] : pair[1]);
+  const shuffleArr = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  function newQuiz() {
+    // one question per learning outcome, then 2 more from the rest, in random order
+    const byLo = {}; QB.forEach((q, i) => { (byLo[q.lo] = byLo[q.lo] || []).push(i); });
+    const chosen = LOS.map((l) => shuffleArr(byLo[l.id].slice())[0]);
+    const rest = shuffleArr(QB.map((_, i) => i).filter((i) => !chosen.includes(i))).slice(0, 2);
+    quiz.items = shuffleArr([...chosen, ...rest]).map((qi) => ({ qi, order: shuffleArr([0, 1, 2, 3]) }));
+    quiz.i = 0; quiz.picked = null; quiz.checked = false; quiz.answers = []; quiz.phase = 'q';
+  }
+  function goTo(go) {
+    if (!go) return;
+    if (go.tab) { state.tab = go.tab; renderTabs(); renderTab(); }
+    if (go.el === 'eda-panel' && !state.edaOpen) { state.edaOpen = true; renderEDA(); }
+    const el = $(go.el === 'tabs' ? 'ev-panel' : go.el); if (!el) return;
+    el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    el.classList.add('hl'); setTimeout(() => el.classList.remove('hl'), 2600);
+  }
+  function syncQuizToggle() {
+    $('quiz-body').hidden = !state.quizOpen;
+    $('quiz-toggle').textContent = state.quizOpen ? L('ซ่อนส่วนนี้ ▴', 'Hide this section ▴') : L('แสดงแบบทดสอบ ▾', 'Show the quiz ▾');
+  }
+  function renderQuiz() {
+    syncQuizToggle();
+    const body = $('quiz-body');
+    if (quiz.phase === 'intro') {
+      let best = null; try { best = localStorage.getItem('bpl-quiz-best'); } catch (e) {}
+      body.innerHTML = `<p>${L('สุ่ม 8 ข้อจากคลังคำถาม 20 ข้อ ครอบคลุมผลลัพธ์การเรียนรู้ทั้ง 6 ข้อ อย่างน้อยข้อละ 1 คำถาม แต่ละข้อมีคำใบ้ให้ลองทำบนเว็บ ตอบแล้วรู้ผลและเหตุผลทันที ทำซ้ำได้ไม่จำกัด ทุกครั้งจะได้ชุดใหม่ ไม่มีการเก็บคะแนน', 'Eight questions drawn at random from a bank of 20, at least one for each of the 6 learning outcomes. Each has a hint to try on the page; you see the answer and the reason right away. Retry as often as you like; each attempt draws a new set. Nothing is recorded.')}</p>
+        <div class="stats-wrap"><table class="stats interp"><thead><tr><th>${L('ผลลัพธ์การเรียนรู้', 'Learning outcome')}</th><th>${L('แล็บ', 'Lab')}</th><th>${L('จำนวนข้อในคลัง', 'Questions in bank')}</th></tr></thead><tbody>
+        ${LOS.map((l) => `<tr><td><b>${l.id}</b> ${QL([l.th, l.en])}</td><td>${l.lab}</td><td class="num">${QB.filter((q) => q.lo === l.id).length}</td></tr>`).join('')}</tbody></table></div>
+        ${best ? `<p class="small muted">${L('คะแนนดีที่สุดของคุณในเบราว์เซอร์นี้: ', 'Your best score in this browser: ')}<b>${best}/8</b></p>` : ''}
+        <button class="btn primary" id="quiz-start" style="justify-self:start">${L('เริ่มทำแบบทดสอบ (8 ข้อ)', 'Start the quiz (8 questions)')}</button>`;
+      $('quiz-start').addEventListener('click', () => { newQuiz(); renderQuiz(); });
+      return;
+    }
+    if (quiz.phase === 'q') {
+      const it = quiz.items[quiz.i], Q = QB[it.qi], lo = LOS.find((l) => l.id === Q.lo);
+      const n = quiz.items.length;
+      const opts = it.order.map((oi, k) => {
+        let cls = 'qopt';
+        if (quiz.checked) { if (oi === Q.a) cls += ' right'; else if (oi === quiz.picked) cls += ' wrong'; }
+        else if (oi === quiz.picked) cls += ' sel';
+        return `<button class="${cls}" data-o="${oi}" ${quiz.checked ? 'disabled' : ''}><span class="ql">${'ABCD'[k]}</span><span>${QL(Q.opts[oi])}</span></button>`;
+      }).join('');
+      const ok = quiz.checked && quiz.picked === Q.a;
+      body.innerHTML = `<div class="qhead"><span class="eyebrow">${L('ข้อ', 'Question')} ${quiz.i + 1}/${n}</span><span class="tag">${lo.id} · ${lo.lab}</span></div>
+        <div class="qprog">${quiz.items.map((_, k) => `<span class="${k < quiz.i ? (quiz.answers[k] ? 'ok' : 'no') : k === quiz.i ? 'cur' : ''}"></span>`).join('')}</div>
+        <h3 class="qstem">${QL(Q.q)}</h3>
+        <p class="qtry">${L('ลองบนเว็บ: ', 'Try it: ')}${QL(Q.try)} <button class="linkbtn" id="quiz-go">${L('พาไปดู', 'Show me')}</button></p>
+        <div class="qopts">${opts}</div>
+        ${quiz.checked ? `<div class="qfb ${ok ? 'ok' : 'no'}"><b>${ok ? L('ถูกต้อง', 'Correct') : L('ยังไม่ถูก', 'Not quite')}</b> ${QL(Q.why)}</div>` : ''}
+        <div class="qact">${quiz.checked
+          ? `<button class="btn primary" id="quiz-next">${quiz.i + 1 < n ? L('ข้อต่อไป →', 'Next →') : L('ดูผลลัพธ์', 'See results')}</button>`
+          : `<button class="btn primary" id="quiz-check" ${quiz.picked === null ? 'disabled' : ''}>${L('ตรวจคำตอบ', 'Check answer')}</button>`}</div>`;
+      body.querySelectorAll('.qopt').forEach((b) => b.addEventListener('click', () => { quiz.picked = +b.dataset.o; renderQuiz(); }));
+      $('quiz-go').addEventListener('click', () => goTo(Q.go));
+      const c = $('quiz-check'); if (c) c.addEventListener('click', () => { quiz.checked = true; quiz.answers[quiz.i] = quiz.picked === Q.a; renderQuiz(); });
+      const nx = $('quiz-next'); if (nx) nx.addEventListener('click', () => {
+        if (quiz.i + 1 < n) { quiz.i++; quiz.picked = null; quiz.checked = false; }
+        else {
+          quiz.phase = 'done';
+          const sc = quiz.answers.filter(Boolean).length;
+          try { const b = +(localStorage.getItem('bpl-quiz-best') || 0); if (sc > b) localStorage.setItem('bpl-quiz-best', String(sc)); } catch (e) {}
+        }
+        renderQuiz(); $('quiz-panel').scrollIntoView({ block: 'start' });
+      });
+      return;
+    }
+    // results
+    const sc = quiz.answers.filter(Boolean).length, n = quiz.items.length;
+    const per = LOS.map((l) => { const idx = quiz.items.map((it, k) => [QB[it.qi].lo, k]).filter(([lo]) => lo === l.id).map(([, k]) => k); return { l, tot: idx.length, ok: idx.filter((k) => quiz.answers[k]).length }; });
+    const wrong = quiz.items.map((it, k) => ({ Q: QB[it.qi], k })).filter((x) => !quiz.answers[x.k]);
+    body.innerHTML = `<div class="verdict-box ${sc >= 7 ? 'good' : sc >= 5 ? 'warn' : 'bad'}"><h3>${L('คะแนน', 'Score')} ${sc}/${n}</h3><p>${sc >= 7 ? L('เข้าใจดีมาก พร้อมไปทำ assignment', 'Strong understanding: ready for the assignment.') : sc >= 5 ? L('เข้าใจเป็นส่วนใหญ่ ทบทวนหัวข้อที่ขึ้นสีเหลืองหรือแดงด้านล่าง', 'Mostly there. Review the outcomes marked yellow or red below.') : L('ควรทบทวน ลองทำตามคู่มือทีละขั้นอีกรอบ แล้วทำแบบทดสอบใหม่', 'Worth reviewing: run the step-by-step guide again, then retake the quiz.')}</p></div>
+      <div class="stats-wrap"><table class="stats interp"><thead><tr><th>${L('ผลลัพธ์การเรียนรู้', 'Learning outcome')}</th><th>${L('ถูก', 'Correct')}</th><th>${L('สถานะ', 'Status')}</th></tr></thead><tbody>
+      ${per.map((p) => `<tr><td><b>${p.l.id}</b> ${QL([p.l.th, p.l.en])} <span class="muted small">(${p.l.lab})</span></td><td class="num">${p.ok}/${p.tot}</td><td><span class="chip ${p.ok === p.tot ? 'good' : p.ok ? 'warn' : 'bad'}">${p.ok === p.tot ? L('ผ่าน', 'Met') : L('ทบทวน', 'Review')}</span></td></tr>`).join('')}</tbody></table></div>
+      ${wrong.length ? `<h3>${L('ข้อที่ตอบผิด', 'Questions you missed')}</h3><ol class="discuss">${wrong.map(({ Q }) => `<li><b>${QL(Q.q)}</b><br>${L('คำตอบที่ถูก: ', 'Correct answer: ')}${QL(Q.opts[Q.a])}<br><span class="muted">${QL(Q.why)}</span></li>`).join('')}</ol>` : ''}
+      <button class="btn primary" id="quiz-retry" style="justify-self:start">${L('ทำใหม่ (สุ่มชุดใหม่)', 'Retake (new set)')}</button>`;
+    $('quiz-retry').addEventListener('click', () => { newQuiz(); renderQuiz(); });
+  }
+  $('quiz-toggle').addEventListener('click', () => { state.quizOpen = !state.quizOpen; try { localStorage.setItem('bpl-quiz-open', state.quizOpen ? '1' : '0'); } catch (e) {} syncQuizToggle(); });
+  $('open-quiz').addEventListener('click', () => { state.quizOpen = true; syncQuizToggle(); renderQuiz(); $('quiz-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
   // ================= zone 4: discussion & conclusion =================
   state.sumOpen = true;
   try { if (localStorage.getItem('bpl-sum-open') === '0') state.sumOpen = false; } catch (e) {}
@@ -2200,7 +2431,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const v = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 11)); e.target.value = v;
     state.seed = v; $('busy').hidden = false; await call({ type: 'build', seed: v }); rerun(); renderEDA();
   });
-  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); renderEDA(); syncSumToggle(); };
+  const setLang = (l) => { lang = l; try { localStorage.setItem('bpl-lang', l); } catch (e) {} applyStatic(); flawText(); render(); renderGuide(); renderEDA(); syncSumToggle(); renderQuiz(); };
   $('lang-th').addEventListener('click', () => setLang('th'));
   $('lang-en').addEventListener('click', () => setLang('en'));
 
@@ -2208,6 +2439,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
   buildFlaws(); applyStatic(); flawText(); syncPresets();
   if (state.guideOpen) { const s = STEPS[state.step].setup; if (s) { if (s.flaws) state.flaws = { ...s.flaws }; if (s.model) state.model = s.model; if ('released' in s) state.released = s.released; if (s.tab) state.tab = s.tab; if (s.drift) state.driftWhich = s.drift; syncPresets(); } }
   renderGuide(false);
+  renderQuiz();
   call({ type: 'build', seed: state.seed }).then(() => { rerun(); renderEDA(); });
 })();
 </script>
