@@ -57,6 +57,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
 html[lang="th"] body { line-height: 1.65; }
 .wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 120px; display: grid; gap: 20px; }
@@ -184,6 +185,7 @@ table.cmp td .hint { font-family: var(--f-body); color: var(--ink-3); font-size:
 .chart { position: relative; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .chart text { font-family: var(--f-mono); font-size: 11px; fill: var(--ink-3); }
+.chart text.axt { font-family: var(--f-body); font-size: 12px; fill: var(--ink-2); }
 .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--surface); font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 5; line-height: 1.4; }
 .explain { font-size: 13.5px; color: var(--ink-2); }
 .explain b { color: var(--ink); font-weight: 600; }
@@ -1505,13 +1507,15 @@ if (typeof module !== 'undefined') module.exports = Engine;
   }
 
   // ================= charts =================
-  function axes(x0, x1, y0, y1, w, h, pad, xt, yt, xfmt, yfmt) {
+  function axes(x0, x1, y0, y1, w, h, pad, xt, yt, xfmt, yfmt, titles) {
     const sx = (v) => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r);
     const sy = (v) => h - pad.b - (v - y0) / (y1 - y0) * (h - pad.t - pad.b);
     let g = '';
     yt.forEach((v) => { g += `<line x1="${pad.l}" x2="${w - pad.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--grid)"/><text x="${pad.l - 6}" y="${sy(v) + 4}" text-anchor="end">${yfmt(v)}</text>`; });
     xt.forEach((v) => { g += `<text x="${sx(v)}" y="${h - pad.b + 16}" text-anchor="middle">${xfmt(v)}</text>`; });
     g += `<line x1="${pad.l}" x2="${w - pad.r}" y1="${h - pad.b}" y2="${h - pad.b}" stroke="var(--rule-strong)"/>`;
+    if (titles && titles.x) g += `<text class="axt" x="${pad.l + (w - pad.l - pad.r) / 2}" y="${h - 6}" text-anchor="middle">${esc(titles.x)}</text>`;
+    if (titles && titles.y) { const cy = pad.t + (h - pad.t - pad.b) / 2; g += `<text class="axt" x="14" y="${cy}" text-anchor="middle" transform="rotate(-90 14 ${cy})">${esc(titles.y)}</text>`; }
     return { sx, sy, g };
   }
   const path = (pts, sx, sy) => pts.map((p, i) => (i ? 'L' : 'M') + sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join('');
@@ -1544,14 +1548,15 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const batches = []; for (let i = 0; i < Ls.batch.length; i += step) batches.push([1 + i / bpe, Ls.batch[i]]);
     const all = [...epoch, ...(F3 ? batches : [])].map((p) => p[1]).filter(isFinite);
     const ymax = niceMax(Math.min(Math.max(...all) * 1.05, F3 ? 40 : 1));
-    const w = 520, h = 240, pad = { l: 46, r: 12, t: 12, b: 30 };
-    const a = axes(0, Ls.epoch.length, 0, ymax, w, h, pad, [0, 5, 10, 15, 20], ticks(ymax), (v) => v, (v) => +v.toFixed(2));
+    const w = 520, h = 250, pad = { l: 60, r: 12, t: 12, b: 42 };
+    const a = axes(0, Ls.epoch.length, 0, ymax, w, h, pad, [0, 5, 10, 15, 20], ticks(ymax), (v) => v, (v) => +v.toFixed(2),
+      { x: L('Epoch (รอบที่เทรนครบข้อมูลทั้งหมด)', 'Epoch (full passes over the training data)'), y: L('Training loss (log loss)', 'Training loss (log loss)') });
     const clip = (pts) => pts.map((p) => [p[0], Math.min(ymax, p[1])]);
     let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}`;
     if (F3) s += `<path d="${path(clip(batches), a.sx, a.sy)}" stroke="var(--s2)" stroke-width="1" fill="none" opacity=".55"/>`;
     s += `<path d="${path(clip(epoch), a.sx, a.sy)}" stroke="var(--s1)" stroke-width="2" fill="none"/>`;
     if (F3) s += printed.map((p) => `<circle cx="${a.sx(p[0])}" cy="${a.sy(Math.min(ymax, p[1]))}" r="3.5" fill="var(--s3)" stroke="var(--surface)" stroke-width="1.5"/>`).join('');
-    s += `<line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--ink-3)" stroke-dasharray="3 3" style="display:none"/><text x="${w - pad.r}" y="${h - 4}" text-anchor="end">epoch</text></svg>`;
+    s += `<line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--ink-3)" stroke-dasharray="3 3" style="display:none"/></svg>`;
     const nEpoch = L('loss ของทั้ง epoch', 'full-epoch loss'), nPrinted = L('ค่าที่โน้ตบุ๊กพิมพ์', 'printed (last batch)');
     const series = [{ name: nEpoch, color: 'var(--s1)', pts: epoch }];
     if (F3) series.push({ name: nPrinted, color: 'var(--s3)', pts: printed });
@@ -1563,17 +1568,18 @@ if (typeof module !== 'undefined') module.exports = Engine;
   }
 
   function chartPR(m) {
-    const w = 520, h = 260, pad = { l: 40, r: 12, t: 12, b: 32 };
+    const w = 520, h = 270, pad = { l: 56, r: 12, t: 12, b: 42 };
     const c = { rep: E.prCurve(R.scores.yTest, R.scores.test), today: E.prCurve(R.scores.yToday, R.scores.today) };
     if (state.released) c.next = E.prCurve(R.scores.yNext, R.scores.next);
-    const a = axes(0, 1, 0, 1, w, h, pad, [0, .25, .5, .75, 1], [0, .25, .5, .75, 1], (v) => v, (v) => v);
+    const a = axes(0, 1, 0, 1, w, h, pad, [0, .25, .5, .75, 1], [0, .25, .5, .75, 1], (v) => v, (v) => v,
+      { x: L('Recall (สัดส่วนลูกค้าที่ย้ายที่จับได้)', 'Recall (share of churners caught)'), y: L('Precision (ข้อเสนอที่ส่งถูกคน)', 'Precision (offers that hit)') });
     let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}`;
     s += `<line x1="${a.sx(0)}" x2="${a.sx(1)}" y1="${a.sy(m.todayB.prauc)}" y2="${a.sy(m.todayB.prauc)}" stroke="var(--ink-3)" stroke-dasharray="4 4"/><text x="${a.sx(1) - 4}" y="${a.sy(m.todayB.prauc) - 6}" text-anchor="end">${L('สุ่มเดา = อัตราการย้าย', 'guessing = churn rate')}</text>`;
     const draw = (pts, col) => `<path d="${path(pts.map((p) => [p.r, p.p]), a.sx, a.sy)}" stroke="${col}" stroke-width="2" fill="none" stroke-linejoin="round"/>`;
     if (c.next) s += draw(c.next, 'var(--s3)');
     s += draw(c.today, 'var(--s2)') + draw(c.rep, 'var(--s1)');
     s += `<circle cx="${a.sx(m.today.recall)}" cy="${a.sy(m.today.precision || 0)}" r="5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"/>`;
-    s += `<text x="${a.sx(.5)}" y="${h - 4}" text-anchor="middle">recall</text></svg>`;
+    s += `</svg>`;
     const legend = `<div class="legend-line"><span><span class="swatch" style="background:var(--s1)"></span>${L('Test set ของโน้ตบุ๊ก', 'Notebook test set')} · ${f3(m.rep.prauc)}</span><span><span class="swatch" style="background:var(--s2)"></span>${L('ม.ค. 2026', 'Jan 2026')} · ${f3(m.today.prauc)}</span>${c.next ? `<span><span class="swatch" style="background:var(--s3)"></span>${L('ก.พ. 2026', 'Feb 2026')} · ${f3(m.next.prauc)}</span>` : ''}</div>`;
     const txt = `<p class="explain">${L(`แกนตั้งคือ precision แกนนอนคือ recall PR-AUC คือพื้นที่ใต้เส้นโค้ง จุดกลมคือตำแหน่งที่ threshold ปัจจุบัน (${m.th.toFixed(2)}) พาไปในเดือน ม.ค. ถ้าเส้นน้ำเงินกับส้มห่างกัน แปลว่า test set ของโน้ตบุ๊กไม่ได้บอกความจริงเรื่องการใช้งานจริง`, `Precision (y-axis) against recall (x-axis). PR-AUC is the area under each curve. The dot is where the current threshold (${m.th.toFixed(2)}) puts you in January. A gap between the blue and orange curves means the notebook's test set is not telling the truth about deployment.`)}</p>`;
     return { html: legend + `<div class="chart">${s}</div>` + txt };
@@ -1585,12 +1591,13 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const costs = ths.map((th) => { const c = E.confusion(R.scores.yTest, R.scores.test, th); return [th, (c.fn * E.COST_FN + c.fp * E.COST_FP) / R.scores.yTest.length * 1000]; });
     const at50 = E.metrics(R.scores.yTest, R.scores.test, 0.5).costPer1000;
     const ymax = niceMax(Math.max(...costs.map((c) => c[1]), at50) * 1.05);
-    const w = 520, h = 210, pad = { l: 58, r: 12, t: 12, b: 30 };
-    const a = axes(0, 0.6, 0, ymax, w, h, pad, [0, .1, .2, .3, .4, .5, .6], ticks(ymax), (v) => v.toFixed(1), (v) => '฿' + (v / 1000) + 'k');
+    const w = 520, h = 230, pad = { l: 70, r: 12, t: 12, b: 42 };
+    const a = axes(0, 0.6, 0, ymax, w, h, pad, [0, .1, .2, .3, .4, .5, .6], ticks(ymax), (v) => v.toFixed(1), (v) => '฿' + (v / 1000) + 'k',
+      { x: L('Threshold (ความน่าจะเป็นขั้นต่ำที่จะส่งข้อเสนอ)', 'Threshold (minimum probability that triggers an offer)'), y: L('ต้นทุนต่อลูกค้า 1,000 คน', 'Cost per 1,000 customers') });
     let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}<path d="${path(costs, a.sx, a.sy)}" stroke="var(--s1)" stroke-width="2" fill="none"/>`;
     s += `<line x1="${a.sx(Math.min(0.6, m.th))}" x2="${a.sx(Math.min(0.6, m.th))}" y1="${pad.t}" y2="${h - pad.b}" stroke="${F5 ? 'var(--flaw)' : 'var(--fixed)'}" stroke-width="1.5"/>`;
     s += `<circle cx="${a.sx(Math.min(0.6, R.costTh))}" cy="${a.sy(costs[Math.min(59, Math.max(0, Math.round(R.costTh * 100) - 1))][1])}" r="5" fill="var(--fixed)" stroke="var(--surface)" stroke-width="2"/>`;
-    s += `<line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--ink-3)" stroke-dasharray="3 3" style="display:none"/><text x="${w - pad.r}" y="${h - 4}" text-anchor="end">threshold</text></svg>`;
+    s += `<line class="cross" y1="${pad.t}" y2="${h - pad.b}" stroke="var(--ink-3)" stroke-dasharray="3 3" style="display:none"/></svg>`;
     const c = m.today, n = c.n, per = (v) => int(v / n * 1000);
     const cm = `<div class="cm">
       <span></span><span class="h">${L('โมเดล: จะย้าย', 'Model: will churn')}</span><span class="h">${L('โมเดล: จะอยู่', 'Model: will stay')}</span>
@@ -1637,14 +1644,15 @@ if (typeof module !== 'undefined') module.exports = Engine;
   }
   function chartCalib() {
     const rel = E.reliability(R.scores.yToday, R.scores.today, 10);
-    const w = 520, h = 250, pad = { l: 40, r: 12, t: 12, b: 32 };
+    const w = 520, h = 260, pad = { l: 56, r: 12, t: 12, b: 42 };
     const mx = niceMax(Math.max(0.2, ...rel.pts.map((p) => Math.max(p.pred, p.obs))));
-    const a = axes(0, mx, 0, mx, w, h, pad, ticks(mx), ticks(mx), (v) => +v.toFixed(2), (v) => +v.toFixed(2));
+    const a = axes(0, mx, 0, mx, w, h, pad, ticks(mx), ticks(mx), (v) => +v.toFixed(2), (v) => +v.toFixed(2),
+      { x: L('ความน่าจะเป็นที่โมเดลทำนาย', 'Predicted churn probability'), y: L('สัดส่วนที่ย้ายค่ายจริง', 'Share that actually churned') });
     let s = `<svg viewBox="0 0 ${w} ${h}">${a.g}<line x1="${a.sx(0)}" y1="${a.sy(0)}" x2="${a.sx(mx)}" y2="${a.sy(mx)}" stroke="var(--ink-3)" stroke-dasharray="4 4"/>`;
     const pts = rel.pts.filter((p) => p.n >= 15);
     s += `<path d="${path(pts.map((p) => [Math.min(mx, p.pred), Math.min(mx, p.obs)]), a.sx, a.sy)}" stroke="var(--s2)" stroke-width="2" fill="none"/>`;
     s += pts.map((p) => `<circle cx="${a.sx(Math.min(mx, p.pred))}" cy="${a.sy(Math.min(mx, p.obs))}" r="${Math.min(9, 3 + Math.sqrt(p.n) / 8)}" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"><title>${L('ทำนาย', 'predicted')} ${pct(p.pred)} · ${L('จริง', 'observed')} ${pct(p.obs)} · ${p.n} ${L('เบอร์', 'lines')}</title></circle>`).join('');
-    s += `<text x="${a.sx(mx / 2)}" y="${h - 4}" text-anchor="middle">${L('ความน่าจะเป็นที่ทำนาย', 'predicted churn probability')}</text></svg>`;
+    s += `</svg>`;
     const txt = state.flaws.F9
       ? `<p class="explain">${L('เมื่อเปิด class weight จุดจะอยู่<b>ใต้เส้นทแยง</b>: โมเดลบอก 40% แต่คนที่ย้ายจริงน้อยกว่านั้นมาก อันดับ (PR-AUC) อาจดูดี ทั้งที่ความน่าจะเป็นผิด', 'With class weights on, the points sit <b>below the diagonal</b>: when the model says 40%, far fewer actually leave. Ranking (PR-AUC) can look fine while the probabilities are wrong.')}</p>`
       : `<p class="explain">${L('จุดใกล้เส้นทแยงแปลว่าที่ทำนาย 10% ก็ย้ายจริงราว 10% จึงนำความน่าจะเป็นไปคำนวณต้นทุนได้', 'Points near the diagonal mean a predicted 10% really is about 10%. That is what lets you plug the probabilities into a cost calculation.')}</p>`;
@@ -1742,9 +1750,10 @@ if (typeof module !== 'undefined') module.exports = Engine;
     const kpiHtml = `<div class="kpis">${kpis.map(([k, v, s]) => `<div class="kpi"><span class="k">${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('')}</div>`;
 
     // churn rate by quarter
-    const w = 520, h = 220, pad = { l: 44, r: 10, t: 12, b: 30 };
+    const w = 520, h = 240, pad = { l: 60, r: 10, t: 12, b: 42 };
     const qs = d.quarters, ymax = niceMax(Math.max(...qs.map((q) => q.rate)) * 1.15);
-    const a = axes(0, qs.length, 0, ymax, w, h, pad, [], ticks(ymax), () => '', (v) => (v * 100).toFixed(1) + '%');
+    const a = axes(0, qs.length, 0, ymax, w, h, pad, [], ticks(ymax), () => '', (v) => (v * 100).toFixed(1) + '%',
+      { x: L('ไตรมาสที่ประเมินลูกค้า (ปี ค.ศ.)', 'Scoring quarter (year)'), y: L('อัตราการย้ายค่าย (%)', 'Churn rate (%)') });
     const bw = (w - pad.l - pad.r) / qs.length;
     let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${L('อัตราการย้ายค่ายรายไตรมาส', 'Churn rate by quarter')}">${a.g}`;
     qs.forEach((q, i) => {
@@ -1785,9 +1794,23 @@ if (typeof module !== 'undefined') module.exports = Engine;
     // histogram by class
     const F = d.features.find((x) => x.f === state.edaFeat) || d.features[1];
     const hs = F.hist, nb = hs.stay.length;
-    const hw = 520, hh2 = 220, hp = { l: 44, r: 10, t: 12, b: 32 };
+    const hw = 520, hh2 = 240, hp = { l: 60, r: 10, t: 12, b: 44 };
     const hmax = niceMax(Math.max(...hs.stay, ...hs.churn) * 1.1);
-    const ha = axes(0, nb, 0, hmax, hw, hh2, hp, [], ticks(hmax), () => '', (v) => (v * 100).toFixed(0) + '%');
+    const UNITS = {
+      tenure_months: ['อายุการเป็นลูกค้า (เดือน)', 'tenure (months)'],
+      monthly_bill_thb: ['ค่าบริการรายเดือน (บาท)', 'monthly bill (baht)'],
+      household_income_thb: ['รายได้ครัวเรือนต่อเดือน (บาท)', 'household income per month (baht)'],
+      age: ['อายุ (ปี)', 'age (years)'],
+      data_usage_gb: ['อินเทอร์เน็ตที่ใช้ต่อเดือน (GB)', 'data used per month (GB)'],
+      dropped_calls_pct: ['สายหลุด (%)', 'dropped calls (%)'],
+      device_age_months: ['อายุเครื่อง (เดือน)', 'device age (months)'],
+      support_tickets_90d: ['จำนวนครั้งที่ติดต่อศูนย์บริการใน 90 วัน', 'support contacts in 90 days (count)'],
+      late_payments_6m: ['จำนวนครั้งที่จ่ายช้าใน 6 เดือน', 'late payments in 6 months (count)'],
+      retention_team_calls: ['จำนวนครั้งที่ทีมรักษาลูกค้าโทรหา', 'retention team calls (count)'],
+    };
+    const unit = UNITS[F.f] || (F.f.startsWith('survey_q') ? [`คะแนนแบบสอบถามข้อ ${F.f.slice(8)} (z-score)`, `survey question ${F.f.slice(8)} score (z-score)`] : [F.f, F.f]);
+    const ha = axes(0, nb, 0, hmax, hw, hh2, hp, [], ticks(hmax), () => '', (v) => (v * 100).toFixed(0) + '%',
+      { x: `${F.f}: ${lang === 'th' ? unit[0] : unit[1]}`, y: L('% ของแต่ละกลุ่ม', '% of each group') });
     const bwh = (hw - hp.l - hp.r) / nb;
     const edge = (i) => hs.lo + i * hs.w;
     const every = Math.max(1, Math.round(nb / 5));
